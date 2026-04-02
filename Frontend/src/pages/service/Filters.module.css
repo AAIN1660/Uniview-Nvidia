@@ -1,0 +1,32 @@
+.filterContainer {
+  padding: 1rem;
+  background-color: #0F3C47;
+}
+.filterContainer label {
+  font-size: 0.8rem;
+  color: white;
+}
+.filterContainer, .filterContainer > div {
+  display: flex;
+  justify-content: space-between;
+  align-items: end;
+  gap: 10px;
+}
+.filterContainer > div > div {
+  display: flex;
+  flex-direction: column;
+}
+
+.filterContainer .activeButton {
+  background-color: #21889F ;
+}
+
+.filterContainer input, .filterContainer button {
+  margin: 0;
+  margin-right: 0.5rem;
+  font-size: 0.9rem;
+  height: 32px;
+  padding: 0 1rem;
+  margin-bottom: 5px;
+}
+

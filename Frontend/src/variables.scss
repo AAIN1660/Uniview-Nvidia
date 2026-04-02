@@ -1,0 +1,52 @@
+/* ------- Global -------- */
+$PrimaryViolet: rgb(0 53 53);
+$PrimaryRed: #EA3647;
+$PrimaryWhite:#FFF;
+
+
+//Theme 1
+
+// Primary and Secondary are mostly used for the theme
+$PrimaryThemeColor: rgb(0,34,34);
+$PrimaryThemeTransparentColor: rgba(0,34,34, 0.3); // Used for scroll bar thumb color and landing page card box shadow color
+$PrimaryThemeTextColor: rgba(255,255,255,1);
+$SecondaryColor: rgb(34, 34, 34);
+$SecondaryTransparentColor: rgba(3, 129, 129, 0.3); // Used as Question background color in QnA Page
+$SecondaryThemeTextColor: rgba(255,255,255,1);
+$QnASideBarColor: rgb(0, 52, 52);
+$QnASideBarTextColor: rgba(255,255,255,1);
+
+// End of Theme 1
+
+
+// // Theme 2
+
+// $PrimaryThemeColor: rgb(190,160,204);
+// $PrimaryThemeTransparentColor: rgba(190,160,204, 0.3); // Used for scroll bar thumb color and landing page card box shadow color
+// $PrimaryThemeTextColor: rgba(0,0,0,1);
+// $SecondaryColor: rgb(101, 64, 141);
+// $SecondaryTransparentColor: rgba(101, 64, 141, 0.3); // Used as Question background color in QnA Page
+// $SecondaryThemeTextColor: rgba(255,255,255,1);
+// $QnASideBarColor: rgb(101, 64, 141);
+// $QnASideBarTextColor: rgba(255,255,255,1);
+
+// // End of Theme 2
+
+
+
+// Uniform across all themes
+
+// Used for cancel buttons on hover
+$TertiaryColor: rgb(161, 104, 55);
+
+// Primary Background: For the whole background of the app
+$PrimaryBackground:#F5F5F5;
+
+// Table Header: Used at the header of each table
+$TableHeader: rgb(227, 220, 231);
+
+// Action Button Color: Used for Forgot Password Action and Login Action in Login page and Forgot Password Page respectively
+$ActionButtonColor: rgb(0,53,53);
+
+// Icon color: used in landing page and credit History Page
+$IconColor: rgb(255, 217, 90);

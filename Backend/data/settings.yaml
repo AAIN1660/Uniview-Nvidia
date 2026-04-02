@@ -1,0 +1,77 @@
+async_mode: threaded
+chunks:
+  group_by_columns:
+  - id
+  overlap: 100
+  size: 1200
+claim_extraction:
+  description: Any claims or facts that could be relevant to information discovery.
+  max_gleanings: 1
+  prompt: prompts/claim_extraction.txt
+cluster_graph:
+  max_cluster_size: 10
+community_reports:
+  max_input_length: 8000
+  max_length: 2000
+  prompt: prompts/community_report.txt
+embed_graph:
+  enabled: false
+embeddings:
+  async_mode: threaded
+  llm:
+    api_base: ${OPENAI_API_BASE}
+    api_key: ${OPENAI_API_KEY}
+    api_version: 2024-02-15-preview
+    deployment_name: text-embedding-3-small
+    model: text-embedding-3-small
+    type: azure_openai_embedding
+encoding_model: cl100k_base
+entity_extraction:
+  entity_types:
+  - organization
+  - person
+  - geo
+  - event
+  max_gleanings: 1
+  prompt: prompts/entity_extraction.txt
+global_search: null
+input:
+  base_dir: graphraginput/input
+  connection_string: ${BLOB_STORAGE_CONNECTION_STRING}
+  container_name: ${BLOB_STORAGE_CONTAINER_NAME}
+  file_encoding: utf-8
+  file_pattern: .*\.txt$
+  file_type: text
+  type: blob
+llm:
+  api_base: ${OPENAI_API_BASE}
+  api_key: ${OPENAI_API_KEY}
+  api_version: 2024-02-15-preview
+  deployment_name: gpt-4o
+  max_tokens: 4096
+  model: gpt-4o
+  model_supports_json: true
+  type: azure_openai_chat
+local_search: null
+parallelization:
+  stagger: 0.3
+reporting:
+  base_dir: graphragoutput/389ff72d-3880-40a7-9599-b8139ff6d8e2/reports
+  connection_string: ${BLOB_STORAGE_CONNECTION_STRING}
+  container_name: ${BLOB_STORAGE_CONTAINER_NAME}
+  type: blob
+skip_workflows: []
+snapshots:
+  graphml: false
+  raw_entities: false
+  top_level_nodes: false
+storage:
+  base_dir: graphragoutput/389ff72d-3880-40a7-9599-b8139ff6d8e2/artifacts
+  connection_string: ${BLOB_STORAGE_CONNECTION_STRING}
+  container_name: ${BLOB_STORAGE_CONTAINER_NAME}
+  type: blob
+summarize_descriptions:
+  max_length: 500
+  prompt: prompts/summarize_descriptions.txt
+umap:
+  enabled: false

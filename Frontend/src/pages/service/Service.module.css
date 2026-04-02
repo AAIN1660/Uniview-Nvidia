@@ -1,0 +1,154 @@
+.chatBtnContainer {
+  padding: 1rem;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: end;
+}
+
+.chatBtn {
+  background: none;
+  border: none;
+  font-family: "Segoe UI", "Segoe UI Web (West European)", "Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, "Helvetica Neue", sans-serif;
+  -webkit-font-smoothing: antialiased;
+  font-size: 14px;
+  font-weight: 400;
+  color: rgb(50, 49, 48);
+}
+
+.titleRow {
+  display: flex;
+  justify-content: space-between;
+  padding: 0 1rem;
+}
+
+.titleRow svg {
+  font-size: 1.7rem;
+  margin: 10px;
+}
+.titleRow svg:hover {
+  cursor: pointer;
+}
+
+.sr_no {
+  padding: 0.5rem 1rem;
+  margin: 0.5rem 0 0 1rem;
+  background-color: #2DB5D3;
+  width: fit-content;
+}
+
+.detailsWrapper {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+}
+
+.printAction {
+  background-color: #0F3C47;
+  padding: 0.5rem 1rem;
+  margin: 0.5rem;
+  margin-bottom: 2rem;
+  float: right;
+  color: white;
+}
+.printAction span, .cancelAction span {
+  margin-left: 1.5rem;
+  font-size: 1.3rem;
+}
+
+.cancelAction {
+  background-color: #C00000;
+  padding: 0.5rem 1rem;
+  margin: 0.5rem;
+  margin-bottom: 2rem;
+  float: right;
+  color: white;
+}
+
+.allServicesContent {
+  display: flex;
+  flex-direction: column;
+}
+
+.dashboard {
+  padding:  0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  margin-top: 1.5rem;
+}
+
+
+
+.dashboard .dashboardUpper {
+  display: flex;
+  justify-content: space-around;
+  width: 100%;
+}
+
+.dashboard .dashboardUpper .box {
+  width: 22%;
+  height: 150px;
+  background-color: #E0CFEB;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  align-items: start;
+  justify-content: center;
+}
+.dashboard .dashboardUpper .box h5, .dashboard .dashboardUpper .box h3 {
+  width: 100%;
+  text-align: center;
+}
+
+.dashboard .dashboardUpper .box svg {
+  font-size: 2rem;
+}
+.dashboard .dashboardUpper .box:nth-child(2) {
+  background-color: #E3F5F9;
+}
+.dashboard .dashboardUpper .box:nth-child(3) {
+  background-color: #F2F2F2;
+}
+.dashboard .dashboardUpper .box:nth-child(4) {
+  background-color: #FCDEDE;
+}
+
+.dashboard .dashboardLower {
+  margin: 2rem;
+}
+
+.dashboard .dashboardLower a svg {
+  font-size: 1.5rem;
+  margin: 0 0.3rem;
+}
+.dashboard .dashboardLower a svg:hover {
+  cursor: pointer;
+}
+.dashboard .dashboardMiddle {
+  padding: 1rem 1.5rem;
+}
+.dashboard .dashboardMiddle input {
+  padding: 5px;
+  border: 2px solid #D9D9D9;
+  border-radius: 0.25rem;
+}
+.dashboard .dashboardMiddle svg {
+  font-size: 2rem;
+  background-color: #D9D9D9;
+  padding: 7px;
+  height: 100%;
+  margin-left: 0.5rem;
+  margin-top: -5px;
+}
+.dashboard .dashboardMiddle svg:hover {
+  cursor: pointer;
+}
+
+.dashboard .dashboardLower p {
+  text-decoration: underline;
+}
+
+.dashboard .dashboardLower p:hover {
+  cursor: pointer;
+}

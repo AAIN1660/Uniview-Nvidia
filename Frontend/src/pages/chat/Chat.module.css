@@ -1,0 +1,164 @@
+.container {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    margin-top: 20px;
+}
+
+.chatRoot {
+    flex: 1;
+    display: flex;
+}
+
+.chatContainer {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+}
+
+.chatEmptyState {
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    max-height: 1024px;
+    padding-top: 60px;
+}
+
+.chatEmptyStateTitle {
+    font-size: 2rem;
+    font-weight: 600;
+    margin-top: 0;
+    margin-bottom: 30px;
+}
+
+.chatEmptyStateSubtitle {
+    font-weight: 600;
+    margin-bottom: 10px;
+    margin-top: 20px;
+    font-size: 1.5rem;
+}
+
+@media only screen and (max-height: 780px) {
+    .chatEmptyState {
+        padding-top: 0;
+    }
+
+    .chatEmptyStateTitle {
+        font-size: 2rem;
+        margin-bottom: 0px;
+    }
+}
+
+.chatMessageStream {
+    flex-grow: 1;
+    max-height: 1024px;
+    max-width: 1028px;
+    width: 100%;
+    overflow-y: auto;
+    padding-left: 24px;
+    padding-right: 24px;
+    display: flex;
+    flex-direction: column;
+}
+
+.chatMessageGpt {
+    margin-bottom: 20px;
+    max-width: 80%;
+    display: flex;
+    min-width: 500px;
+}
+
+.chatMessageGptMinWidth {
+    max-width: 500px;
+    margin-bottom: 20px;
+}
+
+.chatInput {
+    position: sticky;
+    bottom: 0;
+    flex: 0 0 100px;
+    padding-top: 12px;
+    padding-bottom: 24px;
+    padding-left: 24px;
+    padding-right: 24px;
+    width: 100%;
+    max-width: 1028px;
+    background: #f2f2f2;
+    margin-bottom: 16px;
+}
+
+.chatAnalysisPanel {
+    flex: 1;
+    overflow-y: auto;
+    max-height: 89vh;
+    margin-left: 20px;
+    margin-right: 20px;
+}
+
+.chatSettingsSeparator {
+    margin-top: 15px;
+    margin-bottom: 16px;
+}
+
+.loadingLogo {
+    font-size: 28px;
+}
+
+.commandsContainer {
+    display: flex;
+    align-self: flex-end;
+}
+
+.commandButton {
+    margin-right: 20px;
+    margin-bottom: 20px;
+}
+
+.labelWeight {
+    font-weight: 600 !important;
+    margin-bottom: 7px;
+}
+
+.whiteColor {
+ position: relative !important;
+ top: 1px !important;
+}
+
+.toggleContainer {
+    display: flex;
+    align-items: center;
+  }
+  
+  .leftLabel {
+    margin-right: 10px; 
+    font-size: 15px;
+    text-align: center;
+
+  }
+  
+  .rightLabel {
+    margin-left: 10px; 
+    font-size: 15px;
+    text-align: center;
+
+  }
+  
+  .whiteColor {
+    color: white;
+  }
+
+  .sharepoint-link {
+    display: block; /* Makes the link a block element, taking full width */
+    margin-top: 10px; /* Adds space between the button and the link */
+    color: blue; /* Sets the text color to blue */
+    text-decoration: none; /* Removes the underline from the link */
+    font-size: 16px; /* Sets the font size */
+  }
+  
+  .sharepoint-link:hover {
+    text-decoration: underline; /* Underlines the link on hover */
+  }

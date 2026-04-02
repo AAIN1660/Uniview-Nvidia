@@ -1,0 +1,43 @@
+.container {
+    max-width: 500px;
+  }
+  
+  .card-header h2 {
+    margin: 0;
+  }
+  
+  .tech-notes-label {
+    font-weight: bold;
+    color: white;
+    background-color: #165B6A;
+    padding: 10px;
+    width: 100%;
+  }
+  
+  .tech-notes {
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    background-color: #f9f9f9;
+    margin-top: 10px;
+  }
+  
+  .card-footer {
+    display: flex;
+    justify-content: flex-end;
+  }
+  
+  .card-footer .btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  
+  .comments textarea {
+    width: 100%;
+  }
+
+  .comments select {
+    width: 100%;
+    padding: 0.5rem;
+  }

@@ -1,0 +1,102 @@
+.connection-settings {
+    .add-connection {
+        display: flex;
+        justify-content: flex-end;
+    }
+    .connect-data {
+        width: 50vw;
+    }
+    // input {
+    //     padding: 0;
+    // }
+
+    .connection-name-select {
+        background: #676e89;
+        color: white;
+    }
+}
+
+.addConnectionModal{
+
+    width: 28vw;
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    height: 100vh;
+    z-index: 1010 !important;
+    background-color: white;
+    padding: 16px;
+    box-shadow: rgba(0, 0, 0, 0.22) 0px 25.6px 57.6px 0px, rgba(0, 0, 0, 0.18) 0px 4.8px 14.4px 0px;
+  
+    .container {
+        display: flex;
+        flex-direction: column;
+  
+        > div {
+            flex: 1;
+        }
+  
+        label {
+            margin-top: 8px;
+        }
+    }
+  .modal-header{
+    display: flex;
+    justify-content: space-between;
+  }
+  }
+
+.database-list {
+    display: flex;
+    .tables-list{
+        width: 200px;
+        display: flex;
+        flex-direction: column;
+    .table-name {
+        border: 2px solid #676e89;
+        font-size: 18px;
+        padding: 5px 10px;
+        border-radius: 8px;
+        font-weight: 500;
+        cursor: pointer;
+    }
+    .selected-table-name {
+        border: 2px solid #676e89;
+        background: #676e89;
+        color: white;
+        font-size: 18px;
+        padding: 5px 10px;
+        border-radius: 8px;
+        font-weight: 500;
+        cursor: pointer;
+    }
+    }
+    table {
+        width: 800px;
+        margin-left: 100px;
+        th {
+            background: #676e89;
+            color: white;
+        }
+        th, td {
+            padding: 5px 10px;
+        }
+    }
+}
+
+.view-sample-data {
+    width: 25%;
+    padding: 10px;
+    background-color: transparent;
+    color: black;
+    border: 1px solid #4CAF50;
+    border-radius: 4px;
+    font-size: 16px;
+    margin-top: 10px;
+    &:disabled {
+        cursor:not-allowed;
+        background-color: lightgray;
+        border: lightgray;
+    }
+}

@@ -1,0 +1,293 @@
+/* ############### BOOTSTRAP FRAMEWORK ############### */
+@import "../../variables.scss";
+
+
+
+.modal-header {
+  padding-left: 1.4rem;
+  padding-top: 1.4rem;
+  padding-bottom: 0.4rem;
+  width: 100%;
+}
+
+.modalTitle {
+  font: normal normal bold 20px/16px Helvetica, sans-serif !important;
+  letter-spacing: 0px !important;
+  color: #1C0202 !important;
+  margin: 0.125rem 1rem 1rem 0;
+}
+
+.btn-close {
+  margin-bottom: 0.4rem !important;
+}
+body{
+  overflow-x: hidden;
+}
+
+.overflowcls {
+  overflow: auto;
+  height: auto;
+  max-height: 500px;
+  margin: 1rem;
+  padding: 0;
+}
+
+.preview-modal {
+  width: 70vw !important;
+  margin: 0 auto !important;
+  position: absolute;
+  max-width: 100vw;
+  .modal-content {
+    margin: 7rem 0 0 15vw;
+  }
+}
+
+.previewlabelcls {
+  font: normal normal normal 12px Helvetica, sans-serif !important;
+  font-weight: bold !important;
+  margin-right: 1rem;
+}
+
+.previewtext {
+  font: normal normal normal 12px Helvetica, sans-serif !important;
+  font-weight: 500 !important;
+}
+
+.appendlabelcls {
+  width: 100%;
+  position: relative;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.appendtextcls {
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.preview {
+  table {
+    width: auto;
+    margin: 1rem auto !important;
+
+    tr {
+      th {
+        padding: 0.5rem !important;
+      }
+
+      td {
+        font: normal normal normal 12px/14px Helvetica, sans-serif !important;
+        letter-spacing: 0px !important;
+        color: #262135 !important;
+        padding: 0.5rem !important;
+      }
+    }
+
+  }
+}
+
+.modal-backdrop {
+  background-color: rgb(182, 91, 95);
+}
+
+.documentheader {
+  padding: 16px;
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+}
+.documentstable {
+  padding: 0 !important;
+}
+
+@media only screen and (max-width: 768px){
+  .documentheader {
+    flex-direction: column;
+    align-items: start;
+    padding: 0;
+  }
+}
+// .pagination button {
+//   margin-left: 1px;
+//     background-color: grey;
+//     color: white !important;
+//     border: 1px solid #ddd;
+//     border-radius: 3px;
+// }
+// .pagination button:hover {
+//   margin-left: 1px;
+//     background-color: grey;
+//     color: white !important;
+//     border: 1px solid #ddd;
+//     border-radius: 3px;
+// }
+
+// .pagination button:disabled {
+//   background-color: #d6d6d6; /* Grey background for disabled buttons */
+//   color: #888888; /* Grey text for disabled buttons */
+//   border-color: #c0c0c0; /* Grey border for disabled buttons */
+// }
+// .pagination span {
+//     padding-top: 6px;
+//     padding-left: 5px;
+//     padding-right: 6px;
+// }
+
+.pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 5px;
+  margin-top: 20px;
+  float: right;
+  margin-top: 0px;
+
+  .btn {
+    border: 1px solid #ddd;
+    padding: 5px 10px;
+    border-radius: 5px;
+    background-color: #fff;
+    color: #333;
+    cursor: pointer;
+    height: 31px;
+    font-size: small;
+
+    &:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    &.active {
+      background-color: #004c4c; /* Dark teal */
+      color: #fff;
+    }
+  }
+}
+
+.download-icon {
+  padding: 0px 0px 0px 5px;
+ 
+}
+ 
+.delete-icon {
+  padding: 0.1rem 0.2rem;
+}
+
+.badge {
+  padding: 4px 8px;
+  font-size: 12px;
+  font-weight: bold;
+  border-radius: 12px;
+  color: white;
+  display: inline-block;
+  text-align: center;
+}
+
+.vector-rag {
+  background-color: #4caf50; /* Green for Vector RAG */
+}
+
+.graph-rag {
+  background-color: #2196f3; /* Blue for Graph RAG */
+}
+
+.unindexed {
+  background-color: #f44336; /* Red for Not Indexed */
+}
+
+.iconcls {
+  width: 22px;
+  height: 20px;
+  border-radius: 8px;
+}
+
+.uploadiconcls {
+  font-size: 19px !important;
+  color: red !important;
+}
+
+.documentList{
+  width: 93%;
+  margin-left: 3%;
+}
+
+@media (max-width: 1233px) and (min-width: 1221px) {
+  .documentList {
+      width: 94%;
+      margin-left: 3%;
+  }
+}
+
+@media (max-width: 1220px) and (min-width: 1207px) {
+  .documentList {
+      width: 95%;
+      margin-left: 29px;
+  }
+}
+
+@media (max-width: 1206px) and (min-width: 1193px) {
+  .documentList {
+      width: 97%;
+      margin-left: 18px;
+  }
+}
+
+.icon-container-table {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px; /* Adjust gap between icons */
+  min-width: 40px; /* Ensures spacing when single icon is present */
+  flex-wrap: wrap; /* Allows wrapping if multiple icons are present */
+}
+
+.iconcls {
+  width: 20px; /* Adjust width */
+  height: 20px; /* Adjust height */
+}
+
+.uploadiconcls {
+  font-size: 20px; /* Adjust icon size */
+}
+
+
+.iconcls {
+  position: relative;
+  display: inline-block;
+}
+
+.iconcls[title] {
+  position: relative;
+  cursor: pointer;
+}
+
+.iconcls[title]:hover::after {
+  content: attr(title);
+  position: absolute;
+  left: 50%;
+  bottom: 100%;
+  transform: translateX(-50%);
+  background: linear-gradient(135deg, #ff4081, #ff8c00);
+  color: white;
+  padding: 6px 10px;
+  border-radius: 5px;
+  font-size: 12px;
+  white-space: nowrap;
+  box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.3);
+  opacity: 1;
+  visibility: visible;
+  transition: opacity 0.3s ease-in-out;
+}
+
+.iconcls[title]:hover::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: 100%;
+  transform: translateX(-50%);
+  border-width: 6px;
+  border-style: solid;
+  border-color: transparent transparent #ff8c00 transparent;
+}
+
+
+

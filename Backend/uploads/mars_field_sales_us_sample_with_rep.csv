@@ -1,0 +1,251 @@
+Retailer,Retailer_ID,Invoice_Date,Region,State,City,Product,Price_per_Unit,Units_Sold,Total_Sales,Operating_Profit,Operating_Margin,Sales_Method,Sales_Rep_Name
+Costco,MARS_RTL_1151,2025-04-13,Midwest,IL,Springfield,M&M's Crispy Share Size 2.83oz,2.51,48,120.48,24.4,20.3,Field Visit,Ravi Nair
+CVS,MARS_RTL_1162,2025-09-28,West,AZ,Phoenix,M&M's Crispy Share Size 2.83oz,2.57,49,125.93,28.4,22.6,Distributor Order,Taylor Morgan
+Publix,MARS_RTL_1134,2025-04-17,South,TX,Houston,M&M's Crispy Share Size 2.83oz,2.72,40,108.8,34.49,31.7,Field Visit,Jessica Brown
+Publix,MARS_RTL_1282,2025-03-13,South,FL,Miami,M&M's Caramel Share Size 2.83oz,3.0,48,144.0,43.34,30.1,Field Visit,Samir Patel
+Publix,MARS_RTL_1146,2025-07-08,West,OR,Eugene,M&M's Milk Chocolate Share Size 3.14oz,1.81,54,97.74,30.63,31.3,Field Visit,Ravi Nair
+CVS,MARS_RTL_1180,2025-01-21,South,GA,Savannah,M&M's Milk Chocolate Share Size 3.14oz,1.97,33,65.01,13.44,20.7,Field Visit,Meera Iyer
+Kroger,MARS_RTL_1127,2025-04-13,Midwest,IL,Springfield,M&M's Caramel Share Size 2.83oz,3.05,35,106.75,34.01,31.9,Field Visit,Jordan Lee
+Kroger,MARS_RTL_1272,2025-05-02,West,CA,Los Angeles,M&M's Peanut Butter Single 1.63oz,1.67,49,81.83,18.13,22.2,Field Visit,Ravi Nair
+Target,MARS_RTL_1012,2025-08-03,West,WA,Seattle,M&M's Milk Chocolate Share Size 3.14oz,1.87,33,61.71,11.55,18.7,Distributor Order,Jessica Brown
+Walgreens,MARS_RTL_1091,2025-11-27,Midwest,MI,Grand Rapids,M&M's Caramel Share Size 2.83oz,3.04,41,124.64,39.57,31.7,Distributor Order,Samir Patel
+Target,MARS_RTL_1179,2025-03-29,Midwest,OH,Cleveland,M&M's Minis Tube 1.77oz,1.45,39,56.55,10.85,19.2,Field Visit,Taylor Morgan
+Costco,MARS_RTL_1046,2025-04-10,South,NC,Raleigh,M&M's Minis Tube 1.77oz,1.3,44,57.2,12.3,21.5,Field Visit,Jessica Brown
+CVS,MARS_RTL_1278,2025-06-01,South,TX,Houston,M&M's Milk Chocolate Share Size 3.14oz,1.96,40,78.4,21.96,28.0,Tele-Sales,Jessica Brown
+7-Eleven,MARS_RTL_1271,2025-05-11,Northeast,CT,New Haven,M&M's Minis Tube 1.77oz,1.26,43,54.18,12.45,23.0,Distributor Order,Jordan Lee
+Walmart,MARS_RTL_1284,2025-05-30,Midwest,MN,Minneapolis,M&M's Milk Chocolate Share Size 3.14oz,2.06,42,86.52,23.44,27.1,Field Visit,Emily Carter
+CVS,MARS_RTL_1099,2025-11-05,Midwest,MN,Minneapolis,M&M's Peanut Family Size 10.7oz,5.05,47,237.35,71.18,30.0,Tele-Sales,Samir Patel
+Costco,MARS_RTL_1015,2025-09-15,West,WA,Seattle,M&M's Crispy Share Size 2.83oz,2.55,46,117.3,31.68,27.0,Field Visit,Priya Shah
+Kroger,MARS_RTL_1100,2025-10-21,West,OR,Portland,M&M's Milk Chocolate Share Size 3.14oz,2.0,48,96.0,20.96,21.8,Field Visit,Jessica Brown
+CVS,MARS_RTL_1252,2025-07-11,South,FL,Tampa,M&M's Milk Chocolate Share Size 3.14oz,1.87,49,91.63,19.84,21.6,Field Visit,Emily Carter
+Target,MARS_RTL_1113,2025-10-04,Northeast,MA,Boston,M&M's Crispy Share Size 2.83oz,2.65,43,113.95,29.25,25.7,Field Visit,Priya Shah
+Publix,MARS_RTL_1191,2025-06-10,South,TX,Austin,M&M's Crispy Share Size 2.83oz,2.62,42,110.04,33.03,30.0,Field Visit,Samir Patel
+7-Eleven,MARS_RTL_1278,2025-11-10,Northeast,MA,Boston,M&M's Caramel Share Size 2.83oz,2.93,55,161.15,47.65,29.6,Field Visit,Alex Rivera
+Kroger,MARS_RTL_1018,2025-01-22,Northeast,PA,Pittsburgh,M&M's Minis Tube 1.77oz,1.32,60,79.2,21.26,26.8,Field Visit,Meera Iyer
+Kroger,MARS_RTL_1024,2025-09-10,West,OR,Portland,M&M's Crispy Share Size 2.83oz,2.48,59,146.32,28.66,19.6,Online B2B,Emily Carter
+Target,MARS_RTL_1222,2025-08-24,Midwest,WI,Milwaukee,M&M's Minis Tube 1.77oz,1.21,37,44.77,11.93,26.7,Field Visit,Carlos Hernandez
+Walgreens,MARS_RTL_1173,2025-02-18,Northeast,NJ,Newark,M&M's Peanut Family Size 10.7oz,4.96,55,272.8,68.71,25.2,Field Visit,Alex Rivera
+Publix,MARS_RTL_1144,2025-02-28,South,TX,Houston,M&M's Crispy Share Size 2.83oz,2.62,45,117.9,32.86,27.9,Field Visit,Meera Iyer
+Kroger,MARS_RTL_1038,2025-06-19,Midwest,OH,Columbus,M&M's Minis Tube 1.77oz,1.19,43,51.17,14.52,28.4,Distributor Order,Jordan Lee
+Walgreens,MARS_RTL_1000,2025-07-07,South,VA,Virginia Beach,M&M's Caramel Share Size 2.83oz,2.94,34,99.96,24.1,24.1,Distributor Order,Ravi Nair
+7-Eleven,MARS_RTL_1159,2025-09-28,Northeast,CT,Hartford,M&M's Minis Tube 1.77oz,1.04,56,58.24,16.15,27.7,Field Visit,Taylor Morgan
+Walgreens,MARS_RTL_1232,2025-07-09,Northeast,NY,New York,M&M's Caramel Share Size 2.83oz,3.08,29,89.32,27.96,31.3,Distributor Order,Carlos Hernandez
+Costco,MARS_RTL_1155,2025-06-24,Northeast,NJ,Jersey City,M&M's Crispy Share Size 2.83oz,2.51,44,110.44,28.9,26.2,Field Visit,Jordan Lee
+Walmart,MARS_RTL_1227,2025-02-20,West,OR,Eugene,M&M's Milk Chocolate Share Size 3.14oz,1.93,47,90.71,18.02,19.9,Field Visit,Samir Patel
+CVS,MARS_RTL_1081,2025-02-24,South,VA,Richmond,M&M's Milk Chocolate Share Size 3.14oz,1.83,43,78.69,23.71,30.1,Field Visit,Jordan Lee
+Walgreens,MARS_RTL_1288,2025-09-01,Midwest,IL,Springfield,M&M's Milk Chocolate Share Size 3.14oz,2.13,43,91.59,23.78,26.0,Field Visit,Ravi Nair
+Walmart,MARS_RTL_1098,2025-11-16,South,TX,Houston,M&M's Caramel Share Size 2.83oz,2.92,49,143.08,40.78,28.5,Online B2B,Samir Patel
+Walgreens,MARS_RTL_1052,2025-05-11,Northeast,NJ,Jersey City,M&M's Peanut Butter Single 1.63oz,1.46,47,68.62,18.8,27.4,Tele-Sales,Carlos Hernandez
+Costco,MARS_RTL_1094,2025-11-03,West,WA,Tacoma,M&M's Peanut Family Size 10.7oz,4.83,44,212.52,47.41,22.3,Distributor Order,Ravi Nair
+Costco,MARS_RTL_1221,2025-05-15,South,TX,Houston,M&M's Minis Tube 1.77oz,1.44,39,56.16,10.22,18.2,Field Visit,Priya Shah
+Target,MARS_RTL_1285,2025-01-21,South,GA,Atlanta,M&M's Peanut Family Size 10.7oz,5.08,42,213.36,61.81,29.0,Field Visit,Taylor Morgan
+Walgreens,MARS_RTL_1105,2025-11-25,South,TX,Houston,M&M's Minis Tube 1.77oz,1.12,45,50.4,13.54,26.9,Field Visit,Carlos Hernandez
+Kroger,MARS_RTL_1110,2025-06-16,Northeast,MA,Cambridge,M&M's Crispy Share Size 2.83oz,2.48,38,94.24,28.8,30.6,Field Visit,Priya Shah
+7-Eleven,MARS_RTL_1159,2025-10-01,Midwest,WI,Madison,M&M's Peanut Butter Single 1.63oz,1.41,34,47.94,11.72,24.5,Field Visit,Meera Iyer
+Target,MARS_RTL_1077,2025-03-30,Midwest,WI,Milwaukee,M&M's Milk Chocolate Share Size 3.14oz,1.93,34,65.62,18.13,27.6,Field Visit,Carlos Hernandez
+Kroger,MARS_RTL_1047,2025-11-12,Northeast,NY,Buffalo,M&M's Crispy Share Size 2.83oz,2.55,38,96.9,22.47,23.2,Field Visit,Meera Iyer
+Target,MARS_RTL_1027,2025-01-14,South,FL,Miami,M&M's Peanut Family Size 10.7oz,5.07,27,136.89,38.31,28.0,Distributor Order,Samir Patel
+CVS,MARS_RTL_1238,2025-08-30,West,AZ,Tucson,M&M's Peanut Family Size 10.7oz,4.87,35,170.45,35.03,20.6,Tele-Sales,Priya Shah
+Walmart,MARS_RTL_1230,2025-09-22,Midwest,MI,Grand Rapids,M&M's Crispy Share Size 2.83oz,2.32,39,90.48,22.29,24.6,Field Visit,Taylor Morgan
+Walmart,MARS_RTL_1108,2025-02-22,Midwest,MN,Minneapolis,M&M's Caramel Share Size 2.83oz,3.14,44,138.16,30.36,22.0,Field Visit,Ravi Nair
+Target,MARS_RTL_1225,2025-04-02,South,GA,Atlanta,M&M's Caramel Share Size 2.83oz,3.04,47,142.88,27.75,19.4,Field Visit,Jessica Brown
+Walgreens,MARS_RTL_1111,2025-09-21,West,OR,Eugene,M&M's Caramel Share Size 2.83oz,3.07,45,138.15,40.74,29.5,Distributor Order,Jordan Lee
+Kroger,MARS_RTL_1025,2025-02-04,South,VA,Virginia Beach,M&M's Minis Tube 1.77oz,1.3,38,49.4,11.83,24.0,Field Visit,Alex Rivera
+Walmart,MARS_RTL_1139,2025-07-25,South,TX,Dallas,M&M's Caramel Share Size 2.83oz,3.05,37,112.85,28.73,25.5,Field Visit,Taylor Morgan
+Target,MARS_RTL_1009,2025-03-22,Northeast,NJ,Jersey City,M&M's Peanut Family Size 10.7oz,4.82,41,197.62,42.62,21.6,Tele-Sales,Priya Shah
+Walmart,MARS_RTL_1264,2025-02-19,South,GA,Savannah,M&M's Milk Chocolate Share Size 3.14oz,2.04,43,87.72,27.96,31.9,Field Visit,Jessica Brown
+Kroger,MARS_RTL_1034,2025-01-02,Northeast,PA,Pittsburgh,M&M's Minis Tube 1.77oz,1.35,38,51.3,10.41,20.3,Distributor Order,Taylor Morgan
+Kroger,MARS_RTL_1077,2025-02-23,Midwest,MN,Minneapolis,M&M's Minis Tube 1.77oz,1.46,44,64.24,19.65,30.6,Tele-Sales,Priya Shah
+Walmart,MARS_RTL_1022,2025-04-16,South,TX,Houston,M&M's Milk Chocolate Share Size 3.14oz,2.07,55,113.85,29.16,25.6,Online B2B,Emily Carter
+Kroger,MARS_RTL_1038,2025-09-17,South,GA,Atlanta,M&M's Peanut Butter Single 1.63oz,1.4,51,71.4,18.18,25.5,Distributor Order,Emily Carter
+Costco,MARS_RTL_1156,2025-11-06,Midwest,IL,Chicago,M&M's Minis Tube 1.77oz,1.25,40,50.0,9.23,18.5,Tele-Sales,Meera Iyer
+Target,MARS_RTL_1004,2025-07-10,South,FL,Miami,M&M's Caramel Share Size 2.83oz,3.12,37,115.44,32.45,28.1,Distributor Order,Taylor Morgan
+Walgreens,MARS_RTL_1114,2025-08-06,South,NC,Raleigh,M&M's Peanut Family Size 10.7oz,4.95,40,198.0,40.67,20.5,Online B2B,Emily Carter
+CVS,MARS_RTL_1133,2025-02-13,West,WA,Tacoma,M&M's Peanut Butter Single 1.63oz,1.52,45,68.4,12.49,18.3,Distributor Order,Priya Shah
+Costco,MARS_RTL_1132,2025-06-11,West,AZ,Tucson,M&M's Peanut Family Size 10.7oz,4.88,51,248.88,47.2,19.0,Field Visit,Meera Iyer
+CVS,MARS_RTL_1295,2025-07-21,Northeast,MA,Boston,M&M's Milk Chocolate Share Size 3.14oz,2.24,43,96.32,21.86,22.7,Distributor Order,Priya Shah
+7-Eleven,MARS_RTL_1153,2025-09-27,Northeast,MA,Boston,M&M's Crispy Share Size 2.83oz,2.54,46,116.84,26.7,22.8,Field Visit,Meera Iyer
+Target,MARS_RTL_1016,2025-10-31,West,OR,Portland,M&M's Crispy Share Size 2.83oz,2.47,46,113.62,20.99,18.5,Field Visit,Taylor Morgan
+7-Eleven,MARS_RTL_1062,2025-09-28,South,FL,Orlando,M&M's Minis Tube 1.77oz,1.32,44,58.08,17.45,30.0,Field Visit,Jessica Brown
+Publix,MARS_RTL_1048,2025-08-03,South,TX,Houston,M&M's Caramel Share Size 2.83oz,2.91,55,160.05,33.08,20.7,Field Visit,Ravi Nair
+CVS,MARS_RTL_1143,2025-09-09,West,OR,Eugene,M&M's Milk Chocolate Share Size 3.14oz,2.06,51,105.06,26.62,25.3,Field Visit,Carlos Hernandez
+Target,MARS_RTL_1221,2025-07-09,Midwest,OH,Columbus,M&M's Crispy Share Size 2.83oz,2.52,59,148.68,32.4,21.8,Tele-Sales,Jessica Brown
+Costco,MARS_RTL_1086,2025-10-23,South,NC,Raleigh,M&M's Peanut Family Size 10.7oz,4.96,54,267.84,68.9,25.7,Field Visit,Samir Patel
+Walgreens,MARS_RTL_1254,2025-08-01,Northeast,NY,Rochester,M&M's Minis Tube 1.77oz,1.34,39,52.26,11.19,21.4,Distributor Order,Priya Shah
+Publix,MARS_RTL_1164,2025-07-27,Midwest,WI,Madison,M&M's Peanut Family Size 10.7oz,4.88,39,190.32,39.09,20.5,Tele-Sales,Samir Patel
+Costco,MARS_RTL_1081,2025-08-25,Midwest,IL,Chicago,M&M's Minis Tube 1.77oz,1.17,43,50.31,10.94,21.8,Tele-Sales,Jessica Brown
+CVS,MARS_RTL_1255,2025-02-22,Midwest,IL,Springfield,M&M's Minis Tube 1.77oz,1.21,41,49.61,14.23,28.7,Field Visit,Meera Iyer
+Target,MARS_RTL_1157,2025-10-07,West,OR,Eugene,M&M's Milk Chocolate Share Size 3.14oz,2.22,50,111.0,26.24,23.6,Field Visit,Carlos Hernandez
+CVS,MARS_RTL_1234,2025-08-05,Midwest,MN,St. Paul,M&M's Peanut Family Size 10.7oz,4.71,55,259.05,71.41,27.6,Distributor Order,Carlos Hernandez
+Publix,MARS_RTL_1041,2025-09-09,West,CA,San Francisco,M&M's Peanut Family Size 10.7oz,5.19,52,269.88,48.99,18.2,Field Visit,Alex Rivera
+Walmart,MARS_RTL_1286,2025-07-07,Midwest,OH,Cleveland,M&M's Peanut Family Size 10.7oz,5.06,47,237.82,48.65,20.5,Online B2B,Carlos Hernandez
+Target,MARS_RTL_1189,2025-02-10,Midwest,MI,Grand Rapids,M&M's Caramel Share Size 2.83oz,2.96,47,139.12,32.62,23.5,Field Visit,Ravi Nair
+Publix,MARS_RTL_1163,2025-06-06,Northeast,MA,Boston,M&M's Peanut Butter Single 1.63oz,1.51,60,90.6,28.41,31.4,Field Visit,Carlos Hernandez
+Publix,MARS_RTL_1288,2025-01-15,Midwest,MN,Minneapolis,M&M's Crispy Share Size 2.83oz,2.52,37,93.24,22.97,24.6,Field Visit,Jessica Brown
+Publix,MARS_RTL_1016,2025-10-28,Northeast,NY,New York,M&M's Peanut Butter Single 1.63oz,1.46,47,68.62,13.08,19.1,Field Visit,Alex Rivera
+Costco,MARS_RTL_1171,2025-03-06,South,FL,Tampa,M&M's Minis Tube 1.77oz,1.16,46,53.36,15.07,28.3,Distributor Order,Jessica Brown
+Walgreens,MARS_RTL_1197,2025-11-23,West,CA,San Francisco,M&M's Milk Chocolate Share Size 3.14oz,1.97,48,94.56,17.7,18.7,Tele-Sales,Jessica Brown
+Publix,MARS_RTL_1265,2025-01-09,West,CA,San Diego,M&M's Peanut Family Size 10.7oz,5.07,41,207.87,65.68,31.6,Online B2B,Jordan Lee
+Target,MARS_RTL_1222,2025-05-09,Midwest,MN,Minneapolis,M&M's Peanut Butter Single 1.63oz,1.5,41,61.5,11.39,18.5,Tele-Sales,Alex Rivera
+Kroger,MARS_RTL_1107,2025-05-16,West,AZ,Tucson,M&M's Peanut Butter Single 1.63oz,1.39,50,69.5,15.58,22.4,Field Visit,Jessica Brown
+7-Eleven,MARS_RTL_1209,2025-03-04,Northeast,CT,New Haven,M&M's Crispy Share Size 2.83oz,2.62,39,102.18,30.84,30.2,Field Visit,Jordan Lee
+Walgreens,MARS_RTL_1268,2025-05-19,Northeast,NJ,Jersey City,M&M's Peanut Butter Single 1.63oz,1.49,47,70.03,16.51,23.6,Field Visit,Jordan Lee
+Walgreens,MARS_RTL_1064,2025-03-22,Midwest,IL,Chicago,M&M's Minis Tube 1.77oz,1.23,42,51.66,11.44,22.1,Field Visit,Alex Rivera
+Walmart,MARS_RTL_1192,2025-06-12,Northeast,NY,Rochester,M&M's Milk Chocolate Share Size 3.14oz,1.89,40,75.6,24.0,31.8,Distributor Order,Samir Patel
+Publix,MARS_RTL_1010,2025-10-16,Midwest,WI,Madison,M&M's Milk Chocolate Share Size 3.14oz,1.96,50,98.0,23.15,23.6,Distributor Order,Meera Iyer
+CVS,MARS_RTL_1242,2025-09-18,Northeast,NJ,Newark,M&M's Peanut Family Size 10.7oz,4.95,51,252.45,53.09,21.0,Field Visit,Ravi Nair
+Costco,MARS_RTL_1240,2025-08-19,Northeast,MA,Cambridge,M&M's Peanut Butter Single 1.63oz,1.48,50,74.0,14.91,20.2,Distributor Order,Meera Iyer
+CVS,MARS_RTL_1268,2025-02-10,West,AZ,Phoenix,M&M's Milk Chocolate Share Size 3.14oz,2.14,40,85.6,26.06,30.4,Online B2B,Carlos Hernandez
+Costco,MARS_RTL_1169,2025-01-28,Northeast,NY,New York,M&M's Peanut Butter Single 1.63oz,1.67,34,56.78,13.18,23.2,Field Visit,Ravi Nair
+7-Eleven,MARS_RTL_1175,2025-05-15,Midwest,MI,Grand Rapids,M&M's Minis Tube 1.77oz,1.36,45,61.2,16.09,26.3,Distributor Order,Carlos Hernandez
+Publix,MARS_RTL_1039,2025-07-20,Midwest,OH,Columbus,M&M's Minis Tube 1.77oz,1.18,50,59.0,17.79,30.2,Field Visit,Jessica Brown
+Kroger,MARS_RTL_1058,2025-11-24,West,CA,Los Angeles,M&M's Peanut Butter Single 1.63oz,1.52,62,94.24,28.56,30.3,Field Visit,Priya Shah
+Publix,MARS_RTL_1157,2025-09-25,South,FL,Orlando,M&M's Caramel Share Size 2.83oz,2.93,50,146.5,30.33,20.7,Field Visit,Alex Rivera
+Kroger,MARS_RTL_1112,2025-02-02,Northeast,NY,Rochester,M&M's Peanut Family Size 10.7oz,5.05,51,257.55,73.8,28.7,Field Visit,Ravi Nair
+Publix,MARS_RTL_1059,2025-02-17,South,VA,Richmond,M&M's Caramel Share Size 2.83oz,3.21,58,186.18,35.28,18.9,Field Visit,Ravi Nair
+Walmart,MARS_RTL_1011,2025-03-03,Midwest,IL,Springfield,M&M's Caramel Share Size 2.83oz,3.11,50,155.5,44.5,28.6,Field Visit,Jessica Brown
+Kroger,MARS_RTL_1032,2025-08-04,Midwest,OH,Columbus,M&M's Peanut Family Size 10.7oz,4.84,44,212.96,41.38,19.4,Distributor Order,Samir Patel
+Walgreens,MARS_RTL_1284,2025-10-20,Northeast,MA,Cambridge,M&M's Peanut Family Size 10.7oz,4.92,63,309.96,87.53,28.2,Online B2B,Jordan Lee
+7-Eleven,MARS_RTL_1083,2025-04-09,Midwest,OH,Columbus,M&M's Minis Tube 1.77oz,1.36,55,74.8,15.7,21.0,Field Visit,Jessica Brown
+Walmart,MARS_RTL_1279,2025-06-21,West,WA,Seattle,M&M's Crispy Share Size 2.83oz,2.54,38,96.52,27.87,28.9,Distributor Order,Emily Carter
+CVS,MARS_RTL_1049,2025-08-02,West,OR,Portland,M&M's Crispy Share Size 2.83oz,2.49,47,117.03,28.95,24.7,Field Visit,Jordan Lee
+Walmart,MARS_RTL_1235,2025-02-04,West,CO,Denver,M&M's Caramel Share Size 2.83oz,2.93,48,140.64,36.94,26.3,Field Visit,Alex Rivera
+Publix,MARS_RTL_1204,2025-08-15,Northeast,CT,New Haven,M&M's Caramel Share Size 2.83oz,2.94,43,126.42,33.38,26.4,Field Visit,Jordan Lee
+7-Eleven,MARS_RTL_1216,2025-04-11,Northeast,PA,Pittsburgh,M&M's Milk Chocolate Share Size 3.14oz,1.99,35,69.65,22.16,31.8,Field Visit,Samir Patel
+Publix,MARS_RTL_1085,2025-05-11,West,CO,Denver,M&M's Peanut Family Size 10.7oz,4.93,33,162.69,49.39,30.4,Field Visit,Jordan Lee
+7-Eleven,MARS_RTL_1115,2025-09-14,Midwest,MI,Grand Rapids,M&M's Peanut Family Size 10.7oz,5.09,38,193.42,37.65,19.5,Tele-Sales,Alex Rivera
+Kroger,MARS_RTL_1122,2025-01-05,Midwest,IL,Springfield,M&M's Milk Chocolate Share Size 3.14oz,2.05,30,61.5,17.18,27.9,Distributor Order,Samir Patel
+Target,MARS_RTL_1083,2025-08-06,Midwest,OH,Columbus,M&M's Peanut Butter Single 1.63oz,1.5,52,78.0,21.07,27.0,Field Visit,Meera Iyer
+Target,MARS_RTL_1013,2025-09-12,South,FL,Orlando,M&M's Crispy Share Size 2.83oz,2.59,40,103.6,31.29,30.2,Field Visit,Ravi Nair
+Walgreens,MARS_RTL_1237,2025-10-10,West,AZ,Tucson,M&M's Minis Tube 1.77oz,1.35,45,60.75,17.05,28.1,Field Visit,Ravi Nair
+Publix,MARS_RTL_1058,2025-07-26,South,NC,Raleigh,M&M's Peanut Butter Single 1.63oz,1.6,49,78.4,14.45,18.4,Field Visit,Carlos Hernandez
+Costco,MARS_RTL_1212,2025-01-15,South,FL,Miami,M&M's Crispy Share Size 2.83oz,2.63,51,134.13,34.35,25.6,Field Visit,Meera Iyer
+Walmart,MARS_RTL_1249,2025-02-11,Northeast,NJ,Jersey City,M&M's Crispy Share Size 2.83oz,2.57,43,110.51,29.06,26.3,Online B2B,Meera Iyer
+Costco,MARS_RTL_1130,2025-06-28,Northeast,NJ,Jersey City,M&M's Minis Tube 1.77oz,1.23,38,46.74,14.77,31.6,Field Visit,Jordan Lee
+7-Eleven,MARS_RTL_1040,2025-03-04,Midwest,MN,Minneapolis,M&M's Caramel Share Size 2.83oz,3.03,45,136.35,35.86,26.3,Field Visit,Ravi Nair
+Kroger,MARS_RTL_1027,2025-08-19,Midwest,OH,Columbus,M&M's Minis Tube 1.77oz,1.4,44,61.6,11.72,19.0,Field Visit,Alex Rivera
+Target,MARS_RTL_1092,2025-08-29,Midwest,MN,St. Paul,M&M's Milk Chocolate Share Size 3.14oz,1.92,44,84.48,22.51,26.6,Distributor Order,Taylor Morgan
+Publix,MARS_RTL_1283,2025-02-21,Northeast,MA,Boston,M&M's Minis Tube 1.77oz,1.44,49,70.56,21.24,30.1,Tele-Sales,Taylor Morgan
+Kroger,MARS_RTL_1129,2025-04-06,Northeast,CT,New Haven,M&M's Peanut Family Size 10.7oz,5.01,28,140.28,34.13,24.3,Online B2B,Samir Patel
+7-Eleven,MARS_RTL_1160,2025-08-10,Northeast,MA,Cambridge,M&M's Crispy Share Size 2.83oz,2.5,54,135.0,34.04,25.2,Field Visit,Ravi Nair
+Costco,MARS_RTL_1293,2025-08-19,West,AZ,Tucson,M&M's Peanut Family Size 10.7oz,5.04,38,191.52,60.48,31.6,Field Visit,Ravi Nair
+Publix,MARS_RTL_1156,2025-08-25,West,AZ,Phoenix,M&M's Caramel Share Size 2.83oz,3.07,51,156.57,45.62,29.1,Online B2B,Taylor Morgan
+Walmart,MARS_RTL_1146,2025-05-23,South,VA,Virginia Beach,M&M's Minis Tube 1.77oz,1.17,46,53.82,10.89,20.2,Tele-Sales,Ravi Nair
+Walgreens,MARS_RTL_1072,2025-06-20,Northeast,NY,New York,M&M's Minis Tube 1.77oz,1.32,43,56.76,15.52,27.3,Distributor Order,Jordan Lee
+Target,MARS_RTL_1278,2025-01-29,South,VA,Richmond,M&M's Milk Chocolate Share Size 3.14oz,2.13,36,76.68,13.86,18.1,Field Visit,Emily Carter
+Costco,MARS_RTL_1198,2025-02-05,South,VA,Richmond,M&M's Crispy Share Size 2.83oz,2.71,46,124.66,22.69,18.2,Tele-Sales,Priya Shah
+Publix,MARS_RTL_1109,2025-01-13,Midwest,MI,Grand Rapids,M&M's Caramel Share Size 2.83oz,3.1,45,139.5,43.69,31.3,Distributor Order,Meera Iyer
+Costco,MARS_RTL_1116,2025-06-09,Northeast,NJ,Newark,M&M's Crispy Share Size 2.83oz,2.5,40,100.0,23.52,23.5,Field Visit,Carlos Hernandez
+CVS,MARS_RTL_1020,2025-11-23,South,GA,Atlanta,M&M's Minis Tube 1.77oz,1.17,55,64.35,19.93,31.0,Field Visit,Samir Patel
+7-Eleven,MARS_RTL_1140,2025-07-06,Midwest,OH,Cleveland,M&M's Caramel Share Size 2.83oz,2.82,40,112.8,32.99,29.2,Field Visit,Emily Carter
+Publix,MARS_RTL_1105,2025-08-31,West,WA,Tacoma,M&M's Milk Chocolate Share Size 3.14oz,1.98,45,89.1,26.76,30.0,Distributor Order,Taylor Morgan
+Walgreens,MARS_RTL_1070,2025-03-27,South,TX,Dallas,M&M's Minis Tube 1.77oz,1.43,46,65.78,17.67,26.9,Online B2B,Meera Iyer
+Walgreens,MARS_RTL_1117,2025-10-11,Northeast,PA,Philadelphia,M&M's Peanut Family Size 10.7oz,4.98,39,194.22,46.14,23.8,Distributor Order,Ravi Nair
+Publix,MARS_RTL_1151,2025-03-07,West,CA,San Francisco,M&M's Peanut Butter Single 1.63oz,1.42,52,73.84,20.19,27.3,Field Visit,Carlos Hernandez
+Costco,MARS_RTL_1241,2025-06-19,Northeast,NY,Rochester,M&M's Crispy Share Size 2.83oz,2.58,53,136.74,26.45,19.3,Field Visit,Ravi Nair
+Walgreens,MARS_RTL_1159,2025-02-14,South,FL,Miami,M&M's Caramel Share Size 2.83oz,2.94,37,108.78,28.67,26.4,Tele-Sales,Alex Rivera
+Target,MARS_RTL_1124,2025-03-03,South,TX,Houston,M&M's Peanut Butter Single 1.63oz,1.51,35,52.85,13.79,26.1,Field Visit,Alex Rivera
+CVS,MARS_RTL_1035,2025-05-14,West,AZ,Phoenix,M&M's Crispy Share Size 2.83oz,2.43,39,94.77,17.98,19.0,Field Visit,Carlos Hernandez
+Target,MARS_RTL_1004,2025-10-11,West,OR,Eugene,M&M's Minis Tube 1.77oz,1.19,40,47.6,13.1,27.5,Field Visit,Carlos Hernandez
+Target,MARS_RTL_1258,2025-01-28,Midwest,MI,Detroit,M&M's Crispy Share Size 2.83oz,2.56,50,128.0,24.12,18.8,Tele-Sales,Taylor Morgan
+Costco,MARS_RTL_1286,2025-04-18,South,TX,Austin,M&M's Peanut Family Size 10.7oz,5.18,34,176.12,50.35,28.6,Field Visit,Carlos Hernandez
+Costco,MARS_RTL_1135,2025-02-13,West,OR,Eugene,M&M's Caramel Share Size 2.83oz,2.94,57,167.58,49.92,29.8,Field Visit,Jordan Lee
+CVS,MARS_RTL_1230,2025-10-13,West,CA,Los Angeles,M&M's Crispy Share Size 2.83oz,2.35,51,119.85,22.18,18.5,Field Visit,Ravi Nair
+Target,MARS_RTL_1236,2025-11-27,Midwest,IL,Chicago,M&M's Peanut Family Size 10.7oz,5.0,41,205.0,49.73,24.3,Tele-Sales,Emily Carter
+Walgreens,MARS_RTL_1261,2025-05-08,South,GA,Atlanta,M&M's Caramel Share Size 2.83oz,3.06,46,140.76,35.21,25.0,Field Visit,Jessica Brown
+CVS,MARS_RTL_1081,2025-08-19,Northeast,MA,Cambridge,M&M's Peanut Family Size 10.7oz,5.02,51,256.02,48.98,19.1,Field Visit,Carlos Hernandez
+Target,MARS_RTL_1129,2025-07-09,South,FL,Orlando,M&M's Crispy Share Size 2.83oz,2.52,46,115.92,30.2,26.1,Field Visit,Samir Patel
+Walmart,MARS_RTL_1163,2025-08-13,South,TX,Dallas,M&M's Caramel Share Size 2.83oz,2.94,60,176.4,48.21,27.3,Field Visit,Alex Rivera
+7-Eleven,MARS_RTL_1024,2025-10-10,South,NC,Charlotte,M&M's Crispy Share Size 2.83oz,2.58,51,131.58,34.63,26.3,Online B2B,Jordan Lee
+Costco,MARS_RTL_1145,2025-05-01,Northeast,PA,Philadelphia,M&M's Caramel Share Size 2.83oz,2.82,43,121.26,25.08,20.7,Field Visit,Meera Iyer
+CVS,MARS_RTL_1266,2025-04-26,Midwest,WI,Milwaukee,M&M's Milk Chocolate Share Size 3.14oz,2.12,44,93.28,17.77,19.0,Distributor Order,Jessica Brown
+CVS,MARS_RTL_1262,2025-08-21,West,CO,Denver,M&M's Crispy Share Size 2.83oz,2.36,39,92.04,18.81,20.4,Tele-Sales,Emily Carter
+CVS,MARS_RTL_1230,2025-09-16,Midwest,WI,Madison,M&M's Caramel Share Size 2.83oz,3.05,48,146.4,37.12,25.4,Field Visit,Jessica Brown
+Walgreens,MARS_RTL_1228,2025-07-17,Northeast,CT,New Haven,M&M's Peanut Family Size 10.7oz,4.97,51,253.47,69.79,27.5,Field Visit,Carlos Hernandez
+7-Eleven,MARS_RTL_1064,2025-05-17,Northeast,CT,New Haven,M&M's Peanut Family Size 10.7oz,4.89,48,234.72,44.37,18.9,Field Visit,Taylor Morgan
+Walmart,MARS_RTL_1187,2025-11-14,South,VA,Virginia Beach,M&M's Minis Tube 1.77oz,1.17,41,47.97,11.83,24.7,Field Visit,Alex Rivera
+Costco,MARS_RTL_1041,2025-06-14,Northeast,NJ,Newark,M&M's Milk Chocolate Share Size 3.14oz,1.99,41,81.59,19.68,24.1,Field Visit,Alex Rivera
+Target,MARS_RTL_1241,2025-08-13,Midwest,MN,St. Paul,M&M's Minis Tube 1.77oz,1.29,43,55.47,11.75,21.2,Distributor Order,Meera Iyer
+Walgreens,MARS_RTL_1172,2025-11-03,South,VA,Virginia Beach,M&M's Crispy Share Size 2.83oz,2.62,45,117.9,21.91,18.6,Field Visit,Taylor Morgan
+Kroger,MARS_RTL_1108,2025-08-22,South,GA,Savannah,M&M's Milk Chocolate Share Size 3.14oz,1.86,42,78.12,21.29,27.3,Field Visit,Ravi Nair
+Kroger,MARS_RTL_1260,2025-06-21,Northeast,NJ,Jersey City,M&M's Crispy Share Size 2.83oz,2.39,55,131.45,27.85,21.2,Online B2B,Priya Shah
+Walgreens,MARS_RTL_1048,2025-06-01,West,CO,Boulder,M&M's Milk Chocolate Share Size 3.14oz,2.04,51,104.04,33.0,31.7,Tele-Sales,Jordan Lee
+7-Eleven,MARS_RTL_1159,2025-11-11,South,NC,Raleigh,M&M's Peanut Butter Single 1.63oz,1.71,29,49.59,13.08,26.4,Field Visit,Alex Rivera
+Publix,MARS_RTL_1123,2025-06-09,Midwest,IL,Springfield,M&M's Caramel Share Size 2.83oz,3.02,48,144.96,26.35,18.2,Online B2B,Samir Patel
+Target,MARS_RTL_1031,2025-04-06,Midwest,IL,Springfield,M&M's Milk Chocolate Share Size 3.14oz,1.97,46,90.62,19.12,21.1,Online B2B,Alex Rivera
+CVS,MARS_RTL_1237,2025-08-21,South,NC,Raleigh,M&M's Peanut Butter Single 1.63oz,1.6,40,64.0,18.04,28.2,Field Visit,Jessica Brown
+7-Eleven,MARS_RTL_1282,2025-06-29,Midwest,OH,Columbus,M&M's Crispy Share Size 2.83oz,2.41,50,120.5,31.65,26.3,Field Visit,Alex Rivera
+Walgreens,MARS_RTL_1117,2025-04-23,South,VA,Virginia Beach,M&M's Crispy Share Size 2.83oz,2.62,37,96.94,17.58,18.1,Field Visit,Alex Rivera
+7-Eleven,MARS_RTL_1002,2025-11-14,Northeast,PA,Pittsburgh,M&M's Peanut Butter Single 1.63oz,1.56,43,67.08,13.99,20.9,Tele-Sales,Priya Shah
+Publix,MARS_RTL_1230,2025-02-21,South,GA,Savannah,M&M's Milk Chocolate Share Size 3.14oz,2.06,45,92.7,27.59,29.8,Distributor Order,Priya Shah
+CVS,MARS_RTL_1013,2025-09-25,Northeast,NJ,Newark,M&M's Milk Chocolate Share Size 3.14oz,1.77,49,86.73,25.83,29.8,Field Visit,Emily Carter
+Kroger,MARS_RTL_1100,2025-10-22,Midwest,MN,Minneapolis,M&M's Minis Tube 1.77oz,1.41,39,54.99,15.0,27.3,Field Visit,Ravi Nair
+Walgreens,MARS_RTL_1201,2025-04-23,Midwest,MN,St. Paul,M&M's Milk Chocolate Share Size 3.14oz,2.05,43,88.15,26.66,30.2,Field Visit,Samir Patel
+Kroger,MARS_RTL_1215,2025-04-11,Northeast,NJ,Newark,M&M's Crispy Share Size 2.83oz,2.7,49,132.3,28.81,21.8,Distributor Order,Alex Rivera
+Walmart,MARS_RTL_1210,2025-04-23,Midwest,WI,Madison,M&M's Caramel Share Size 2.83oz,3.11,52,161.72,37.57,23.2,Field Visit,Alex Rivera
+Walmart,MARS_RTL_1182,2025-03-22,Northeast,NJ,Newark,M&M's Crispy Share Size 2.83oz,2.57,41,105.37,28.37,26.9,Field Visit,Jordan Lee
+Walgreens,MARS_RTL_1197,2025-07-06,South,NC,Charlotte,M&M's Milk Chocolate Share Size 3.14oz,2.08,60,124.8,32.35,25.9,Online B2B,Priya Shah
+Kroger,MARS_RTL_1106,2025-04-23,Northeast,CT,New Haven,M&M's Milk Chocolate Share Size 3.14oz,1.93,44,84.92,20.46,24.1,Online B2B,Samir Patel
+Costco,MARS_RTL_1069,2025-01-02,Midwest,MN,St. Paul,M&M's Peanut Family Size 10.7oz,4.86,56,272.16,49.26,18.1,Field Visit,Meera Iyer
+CVS,MARS_RTL_1187,2025-05-10,Northeast,PA,Pittsburgh,M&M's Milk Chocolate Share Size 3.14oz,1.98,40,79.2,24.3,30.7,Field Visit,Emily Carter
+Publix,MARS_RTL_1181,2025-08-08,South,FL,Miami,M&M's Minis Tube 1.77oz,1.27,40,50.8,15.21,29.9,Field Visit,Ravi Nair
+Target,MARS_RTL_1249,2025-02-23,South,TX,Houston,M&M's Crispy Share Size 2.83oz,2.6,34,88.4,24.98,28.3,Field Visit,Taylor Morgan
+Publix,MARS_RTL_1142,2025-08-12,West,AZ,Tucson,M&M's Peanut Family Size 10.7oz,4.92,43,211.56,59.73,28.2,Online B2B,Ravi Nair
+Target,MARS_RTL_1068,2025-08-13,South,FL,Miami,M&M's Milk Chocolate Share Size 3.14oz,2.04,47,95.88,18.79,19.6,Field Visit,Jessica Brown
+Costco,MARS_RTL_1085,2025-05-06,South,TX,Houston,M&M's Minis Tube 1.77oz,1.29,39,50.31,12.88,25.6,Distributor Order,Alex Rivera
+Walmart,MARS_RTL_1016,2025-05-10,Midwest,MI,Detroit,M&M's Peanut Family Size 10.7oz,5.03,44,221.32,60.01,27.1,Field Visit,Emily Carter
+Publix,MARS_RTL_1293,2025-02-22,West,OR,Eugene,M&M's Peanut Butter Single 1.63oz,1.58,38,60.04,12.19,20.3,Field Visit,Jessica Brown
+CVS,MARS_RTL_1213,2025-06-21,South,VA,Richmond,M&M's Caramel Share Size 2.83oz,2.94,59,173.46,49.45,28.5,Tele-Sales,Samir Patel
+Target,MARS_RTL_1247,2025-08-06,Midwest,OH,Cleveland,M&M's Crispy Share Size 2.83oz,2.42,46,111.32,21.68,19.5,Tele-Sales,Taylor Morgan
+Walmart,MARS_RTL_1177,2025-06-09,South,GA,Atlanta,M&M's Peanut Butter Single 1.63oz,1.44,34,48.96,14.0,28.6,Field Visit,Priya Shah
+Publix,MARS_RTL_1054,2025-07-17,Northeast,NJ,Jersey City,M&M's Crispy Share Size 2.83oz,2.44,49,119.56,26.82,22.4,Distributor Order,Emily Carter
+Kroger,MARS_RTL_1282,2025-09-04,Midwest,OH,Cleveland,M&M's Caramel Share Size 2.83oz,2.96,48,142.08,34.33,24.2,Tele-Sales,Emily Carter
+CVS,MARS_RTL_1274,2025-11-20,West,CA,San Diego,M&M's Caramel Share Size 2.83oz,2.95,45,132.75,37.37,28.2,Field Visit,Alex Rivera
+Costco,MARS_RTL_1101,2025-07-22,Midwest,OH,Columbus,M&M's Peanut Butter Single 1.63oz,1.43,39,55.77,17.64,31.6,Field Visit,Carlos Hernandez
+Walmart,MARS_RTL_1133,2025-07-03,South,NC,Raleigh,M&M's Milk Chocolate Share Size 3.14oz,2.02,44,88.88,21.71,24.4,Field Visit,Emily Carter
+Target,MARS_RTL_1130,2025-05-03,West,CO,Boulder,M&M's Peanut Family Size 10.7oz,4.94,34,167.96,40.11,23.9,Online B2B,Jordan Lee
+Kroger,MARS_RTL_1074,2025-09-12,Northeast,NY,New York,M&M's Crispy Share Size 2.83oz,2.46,48,118.08,32.43,27.5,Field Visit,Taylor Morgan
+Publix,MARS_RTL_1247,2025-10-21,West,CA,Los Angeles,M&M's Peanut Butter Single 1.63oz,1.5,41,61.5,11.36,18.5,Field Visit,Taylor Morgan
+CVS,MARS_RTL_1141,2025-10-07,West,CO,Denver,M&M's Milk Chocolate Share Size 3.14oz,2.18,51,111.18,24.06,21.6,Online B2B,Jordan Lee
+Kroger,MARS_RTL_1218,2025-11-21,South,GA,Atlanta,M&M's Peanut Family Size 10.7oz,4.82,54,260.28,60.71,23.3,Online B2B,Meera Iyer
+CVS,MARS_RTL_1083,2025-04-08,Northeast,NY,Buffalo,M&M's Peanut Family Size 10.7oz,4.76,64,304.64,85.02,27.9,Online B2B,Jordan Lee
+Kroger,MARS_RTL_1274,2025-07-17,Northeast,PA,Pittsburgh,M&M's Minis Tube 1.77oz,1.38,40,55.2,10.81,19.6,Distributor Order,Jordan Lee
+7-Eleven,MARS_RTL_1163,2025-08-28,West,CA,San Francisco,M&M's Milk Chocolate Share Size 3.14oz,1.94,41,79.54,17.63,22.2,Field Visit,Taylor Morgan
+CVS,MARS_RTL_1040,2025-05-24,West,OR,Eugene,M&M's Crispy Share Size 2.83oz,2.53,47,118.91,24.49,20.6,Field Visit,Ravi Nair
+7-Eleven,MARS_RTL_1061,2025-04-07,Northeast,PA,Philadelphia,M&M's Peanut Butter Single 1.63oz,1.58,45,71.1,21.07,29.6,Tele-Sales,Taylor Morgan
+Walmart,MARS_RTL_1200,2025-07-20,Northeast,NY,Rochester,M&M's Milk Chocolate Share Size 3.14oz,1.88,42,78.96,16.1,20.4,Online B2B,Carlos Hernandez
+CVS,MARS_RTL_1275,2025-05-04,Northeast,CT,Hartford,M&M's Crispy Share Size 2.83oz,2.48,49,121.52,25.86,21.3,Distributor Order,Alex Rivera
+Kroger,MARS_RTL_1193,2025-07-06,West,WA,Seattle,M&M's Milk Chocolate Share Size 3.14oz,2.22,33,73.26,16.9,23.1,Field Visit,Jessica Brown
+Target,MARS_RTL_1282,2025-11-22,West,OR,Eugene,M&M's Peanut Family Size 10.7oz,5.0,45,225.0,59.74,26.6,Field Visit,Ravi Nair
+Publix,MARS_RTL_1176,2025-09-16,Northeast,CT,New Haven,M&M's Milk Chocolate Share Size 3.14oz,2.1,46,96.6,21.36,22.1,Online B2B,Priya Shah
+Walmart,MARS_RTL_1036,2025-05-28,Northeast,NY,New York,M&M's Minis Tube 1.77oz,1.23,42,51.66,15.62,30.2,Field Visit,Jessica Brown
+Kroger,MARS_RTL_1146,2025-09-09,South,VA,Richmond,M&M's Caramel Share Size 2.83oz,2.95,48,141.6,38.86,27.4,Field Visit,Alex Rivera
+Target,MARS_RTL_1102,2025-05-27,West,WA,Seattle,M&M's Milk Chocolate Share Size 3.14oz,1.88,48,90.24,19.5,21.6,Field Visit,Carlos Hernandez
+Walgreens,MARS_RTL_1145,2025-05-28,Midwest,MN,St. Paul,M&M's Milk Chocolate Share Size 3.14oz,1.77,36,63.72,18.17,28.5,Field Visit,Carlos Hernandez
+Target,MARS_RTL_1242,2025-07-18,South,TX,Austin,M&M's Peanut Family Size 10.7oz,4.92,48,236.16,54.47,23.1,Tele-Sales,Priya Shah
+Target,MARS_RTL_1209,2025-11-04,South,TX,Houston,M&M's Crispy Share Size 2.83oz,2.54,50,127.0,37.6,29.6,Online B2B,Ravi Nair
+Target,MARS_RTL_1080,2025-05-08,Northeast,PA,Philadelphia,M&M's Peanut Butter Single 1.63oz,1.38,45,62.1,11.56,18.6,Field Visit,Meera Iyer
+Walmart,MARS_RTL_1126,2025-02-08,South,TX,Austin,M&M's Milk Chocolate Share Size 3.14oz,1.97,53,104.41,19.93,19.1,Field Visit,Jordan Lee
+CVS,MARS_RTL_1121,2025-05-09,Midwest,MN,St. Paul,M&M's Peanut Family Size 10.7oz,4.93,43,211.99,55.35,26.1,Distributor Order,Ravi Nair
+Walgreens,MARS_RTL_1074,2025-09-24,West,WA,Seattle,M&M's Milk Chocolate Share Size 3.14oz,1.98,45,89.1,18.1,20.3,Tele-Sales,Meera Iyer
+7-Eleven,MARS_RTL_1055,2025-05-31,Northeast,NY,Rochester,M&M's Crispy Share Size 2.83oz,2.46,42,103.32,24.08,23.3,Field Visit,Carlos Hernandez
+Walgreens,MARS_RTL_1125,2025-10-25,South,TX,Houston,M&M's Caramel Share Size 2.83oz,3.0,53,159.0,41.08,25.8,Field Visit,Taylor Morgan
+Walmart,MARS_RTL_1066,2025-04-09,South,VA,Virginia Beach,M&M's Peanut Family Size 10.7oz,5.11,28,143.08,33.53,23.4,Field Visit,Alex Rivera
+Target,MARS_RTL_1261,2025-09-20,South,VA,Richmond,M&M's Minis Tube 1.77oz,1.35,36,48.6,10.88,22.4,Distributor Order,Priya Shah
+Costco,MARS_RTL_1273,2025-09-09,West,CA,Los Angeles,M&M's Minis Tube 1.77oz,1.26,41,51.66,12.12,23.5,Field Visit,Alex Rivera
+Publix,MARS_RTL_1277,2025-05-24,West,AZ,Phoenix,M&M's Milk Chocolate Share Size 3.14oz,2.16,50,108.0,26.1,24.2,Field Visit,Samir Patel
+Publix,MARS_RTL_1108,2025-04-22,South,FL,Miami,M&M's Minis Tube 1.77oz,1.51,42,63.42,20.0,31.5,Tele-Sales,Samir Patel
+Kroger,MARS_RTL_1091,2025-03-01,South,VA,Richmond,M&M's Minis Tube 1.77oz,1.27,54,68.58,17.81,26.0,Tele-Sales,Ravi Nair
+7-Eleven,MARS_RTL_1007,2025-01-02,West,AZ,Phoenix,M&M's Minis Tube 1.77oz,1.52,46,69.92,22.02,31.5,Online B2B,Carlos Hernandez
+Kroger,MARS_RTL_1172,2025-10-31,South,NC,Raleigh,M&M's Minis Tube 1.77oz,1.32,31,40.92,10.04,24.5,Field Visit,Carlos Hernandez
+CVS,MARS_RTL_1016,2025-09-11,South,GA,Savannah,M&M's Crispy Share Size 2.83oz,2.65,45,119.25,31.29,26.2,Field Visit,Jordan Lee
+CVS,MARS_RTL_1074,2025-05-20,Northeast,MA,Boston,M&M's Milk Chocolate Share Size 3.14oz,2.13,55,117.15,28.36,24.2,Tele-Sales,Jordan Lee
+Walgreens,MARS_RTL_1259,2025-02-06,South,VA,Richmond,M&M's Milk Chocolate Share Size 3.14oz,1.91,31,59.21,15.96,27.0,Field Visit,Jordan Lee
+Publix,MARS_RTL_1146,2025-06-09,South,GA,Atlanta,M&M's Minis Tube 1.77oz,1.52,57,86.64,21.38,24.7,Tele-Sales,Taylor Morgan
+Kroger,MARS_RTL_1053,2025-01-09,Midwest,MI,Grand Rapids,M&M's Caramel Share Size 2.83oz,3.01,48,144.48,32.75,22.7,Distributor Order,Jessica Brown
+CVS,MARS_RTL_1056,2025-08-21,Midwest,OH,Columbus,M&M's Peanut Family Size 10.7oz,5.09,41,208.69,59.12,28.3,Distributor Order,Emily Carter
+Walmart,MARS_RTL_1036,2025-04-09,Northeast,CT,New Haven,M&M's Milk Chocolate Share Size 3.14oz,2.04,47,95.88,23.8,24.8,Field Visit,Jessica Brown
+Publix,MARS_RTL_1259,2025-05-27,Midwest,OH,Columbus,M&M's Peanut Butter Single 1.63oz,1.6,49,78.4,15.22,19.4,Distributor Order,Alex Rivera
+Target,MARS_RTL_1144,2025-10-31,South,FL,Orlando,M&M's Crispy Share Size 2.83oz,2.68,49,131.32,24.98,19.0,Field Visit,Jessica Brown
+Walgreens,MARS_RTL_1289,2025-07-27,South,GA,Savannah,M&M's Caramel Share Size 2.83oz,2.94,53,155.82,32.83,21.1,Field Visit,Taylor Morgan
+Kroger,MARS_RTL_1052,2025-05-11,South,TX,Houston,M&M's Caramel Share Size 2.83oz,2.92,38,110.96,33.44,30.1,Field Visit,Alex Rivera

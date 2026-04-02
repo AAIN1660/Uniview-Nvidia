@@ -1,0 +1,65 @@
+/* src/MroTable.css */
+.mrotablecontainer .table-container {
+  padding: 20px;
+  max-width: 1300px;
+  margin: auto;
+}
+
+.mrotablecontainer table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.mrotablecontainer th,
+.mrotablecontainer td {
+  border: 1px solid #dddddd;
+  text-align: left;
+  padding: 8px;
+}
+.mrotablecontainer td {
+  border-right: 2px solid #165b6a !important;
+  border-bottom: 2px solid #165b6a !important;
+  border-left:  1px solid #165b6a !important;
+}
+
+.mrotablecontainer table thead th {
+  background-color: #165b6a !important; /* Background color for table headers */
+  color: white !important; /* Text color for table headers */
+  border-right: 1px solid #fff; /* Right border for separation */
+}
+.mrotablecontainer 
+tr:nth-child(even) {
+  background-color: #f9f9f9;
+}
+
+.pagination {
+  display: flex;
+  justify-content: center;
+  padding: 10px;
+  list-style-type: none;
+}
+
+.pagination li {
+  margin: 0 5px;
+}
+
+.pagination li a {
+  cursor: pointer;
+  padding: 5px 10px;
+  border: 1px solid #ddd;
+  border-radius: 3px;
+  color:#165b6a
+}
+
+.pagination li.active a {
+  background-color: #165b6a;
+  color: white;
+  border-color: #165b6a;
+}
+.mrotablecontainer table > thead > tr > th {
+  text-align: left;
+  color: white !important;
+  font-size: 14px;
+}
+
+

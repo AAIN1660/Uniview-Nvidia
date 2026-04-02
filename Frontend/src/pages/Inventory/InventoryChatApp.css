@@ -1,0 +1,132 @@
+.chatbot-container {
+  display: flex;
+  flex-direction: column;
+  width: 500px; /* Adjust as needed */
+  height: 500px; /* Adjust as needed */
+  border: 1px solid #ccc;
+  border-radius: 10px;
+  background-color: white;
+  overflow: hidden;
+  font-family: Arial, sans-serif;
+  margin: 20px auto; /* Center the chatbot */
+  position: fixed;
+  bottom: 1rem;
+  right: 1rem;
+  z-index: 1031;
+}
+
+.chat-header {
+  background-color: #165B6A;
+  color: white;
+  padding: 10px;
+  text-align: center;
+  position: relative;
+}
+
+.close-button {
+  background: none;
+  border: none;
+  color: white;
+  position: absolute;
+  right: 3px;
+  top: 12px;
+  cursor: pointer;
+}
+
+.chat-window {
+  flex: 1;
+  padding: 10px;
+  overflow-y: auto;
+  overflow-x: hidden; /* Prevent horizontal scroll */
+  word-wrap: break-word; /* Ensure long words break to fit the container */
+}
+
+.message {
+  display: flex;
+  align-items: center;
+  margin: 10px 0;
+}
+
+.message.bot {
+  justify-content: flex-start;
+}
+
+.message.user {
+  justify-content: flex-end;
+}
+
+.icon {
+  width: 20px;
+  height: 30px;
+  margin-right: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.icon svg {
+  width: 100%;
+  height: 100%;
+}
+
+.message.bot .message-text {
+  background-color: #e1e1e1;
+}
+
+.message.user .message-text {
+  background-color: #007bff;
+  color: white;
+}
+
+.message.no-background .message-text {
+  background-color: transparent; /* Remove background color for specific messages */
+}
+
+.message-text {
+  max-width: 200px;
+  padding: 10px;
+  border-radius: 10px;
+  font-size: 13px;
+  word-wrap: break-word; /* Ensure long words break to fit the container */
+}
+
+.chat-input-container {
+  display: flex;
+  border-top: 1px solid #ccc;
+  padding: 10px;
+}
+
+.chat-input-container input {
+  flex: 1;
+  padding: 10px;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+}
+
+.chat-input-container button {
+  padding: 10px;
+  margin-left: 10px;
+  border: none;
+  background-color: #165B6A;
+  color: white;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.chat-table {
+  width: 100%;
+  max-width: 100%;
+  border-collapse: collapse;
+  margin-top: 5px; /* Adjust spacing */
+}
+
+.chat-table th, .chat-table td {
+  border: 1px solid #ddd;
+  padding: 6px; /* Reduce padding */
+  text-align: left;
+  font-size: 10px !important; /* Reduce font size */
+  max-width: 100px; /* Limit width of cells */
+  white-space: nowrap; /* Prevent wrapping */
+  overflow: hidden;
+  text-overflow: ellipsis; /* Show ellipsis for overflow */
+}

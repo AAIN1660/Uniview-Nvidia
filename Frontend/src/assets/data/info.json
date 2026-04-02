@@ -1,0 +1,19 @@
+{
+    "login": {
+        "username": "Specify a username. Allowed only alphanumeric, space ( ), underscore (_), and hyphen (-) characters.",
+        "password": "Minimum 4 characters are needed. Allowed alphanumeric and special characters.",
+        "forgotPassword": "It helps you to get a reset password link to your configured email for your username."
+    },
+    "addDataset": {
+        "datasetname": "Dataset Name",
+        "timestampcolumn": "TimeStamp Column",
+        "fileupload": "Only .txt , .doc, .docx & .pdf files are allowed",
+        "granularity": "Granularity"
+    },
+    "appendDataset": {
+        "fileupload": "Upload a txt file"
+    },
+    "adminDefaultConfig": {
+        "similaritySearchInfo": "Adjust the 'Similarity Sensitivity' (0 to 1) to fine-tune search sensitivity for higher similarity matches, while higher values lead to increased vagueness. We recommend keeping the value between 0.2 to 0.4 for optimal results."
+    }
+}

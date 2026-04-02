@@ -1,0 +1,159 @@
+.healthSummary {
+  padding: 1rem;
+  overflow-x: hidden;
+  width: 100%;
+}
+
+.healthSummary .summaryContainer {
+  display: flex;
+  align-items: start;
+  gap: 1rem;
+}
+
+.healthSummary .summaryContainer table {
+  margin-top: 1.5rem;
+}
+
+.healthSummary .summaryContainer .summaryButton {
+  border: none;
+  background-color: #C7E7EE;
+  padding: 0.5rem;
+  float: right;
+  font-weight: bold;
+}
+.healthSummary .summaryContainer .summary1 {
+  flex: 0.5;
+  background-color: white;
+  padding: 0.5rem;
+}
+
+.healthSummary .summaryContainer .summary1 h5 {
+  background-color: #684281;
+  padding: 0.5rem;
+  color: white;
+}
+
+.healthSummary .summaryContainer .summary1 table tr {
+  border: 3px solid #684281;
+  padding: 0.5rem;
+}
+.healthSummary .summaryContainer .summary1 table tr td {
+  padding: 0.5rem;
+}
+
+.healthSummary .summaryContainer table tr td p {
+  text-decoration: underline;
+}
+.healthSummary .summaryContainer table tr td p:hover {
+  cursor: pointer;
+}
+.healthSummary .summaryContainer .summary1 table tr td:nth-child(1) {
+  border-right: 3px solid #684281;
+  width: 70%;
+}
+.healthSummary .summaryContainer .summary1 table tr td:nth-child(2) {
+  text-align: center;
+} 
+
+.healthSummary .summaryContainer .summary2 {
+  flex: 0.5;
+  float: right;
+  background-color: white;
+  padding: 0.5rem;
+  overflow: hidden;
+}
+
+.healthSummary .summaryContainer .summary2 .summary2Title {
+  font-size: 1.1rem;
+  font-weight: bold;
+}
+
+.healthSummary .summaryContainer .summary2 .eachComponent {
+  display: flex;
+  flex-direction: row;
+  justify-content: start;
+  align-items: center;
+  padding: 0.34rem 0;
+  gap: 1rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  
+}
+.healthSummary .summaryContainer .eachComponent > div {
+  flex: 0.3;
+  border-left:  2px solid gray;
+}
+ .healthSummary .summaryContainer .eachComponent > h6 {
+  flex: 0.3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 0.8rem;
+ }
+ .healthSummary .summaryContainer .eachComponent > h6:nth-child(1) {
+  flex: 0.5;
+ }
+
+.healthSummary .summaryContainer .eachComponent .progess {
+ background-color: #328EA3;
+ width: 50px;
+ display: flex;
+ justify-content: center;
+ align-items: center;
+ height: 24px;
+}
+
+.healthSummary .summaryContainer .summary3 {
+  padding: 1rem;
+  width: 100%;
+}
+
+.healthSummary .summaryContainer .summary3 .summary3Filters {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  justify-content: center;
+  align-items: start;
+}
+
+.healthSummary .summaryContainer .summary3 .summary3Filters select {
+  padding: 0.3rem;
+}
+
+.healthSummary .barChart {
+  width: 100%;
+  display: flex;
+}
+
+.healthSummary .barChart .recharts-wrapper {
+  width: 50%;
+}
+
+.chatButton {
+  position: fixed;
+  bottom: 3rem;
+  right: 1rem;
+  background-color: #165B6A;
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: 50px;
+  height: 50px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+  z-index: 1030;
+  
+}
+.chatButton svg {
+  font-size: 1.5rem;
+}
+  
+.chartLabel {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+}

@@ -1,0 +1,241 @@
+.layout {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.header {
+  background-color: #222222;
+  color: #f2f2f2;
+  padding: 8px 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.headerContainer {
+  display: flex;
+  align-items: center;
+  /* justify-content: space-around; */
+  margin-right: 12px;
+  margin-left: 12px;
+  width: 70%;
+}
+
+.headerTitleContainer {
+  display: flex;
+  align-items: center;
+  margin-right: 40px;
+  color: #f2f2f2;
+  text-decoration: none;
+}
+
+.headerLogo {
+  height: 40px;
+}
+
+.headerTitle {
+  margin: 0;
+  margin-left: 12px;
+  font-weight: 600;
+  font-size: 1.17rem;
+}
+
+.headerNavList {
+  margin: 0;
+  display: flex;
+  list-style: none;
+  padding-left: 0;
+}
+
+.headerNavPageLink {
+  color: #f2f2f2;
+  text-decoration: none;
+  opacity: 0.75;
+
+  transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+  transition-duration: 500ms;
+  transition-property: opacity;
+}
+
+.headerNavPageLink:hover {
+  opacity: 1;
+}
+
+.headerNavPageLinkActive {
+  color: #f2f2f2;
+  text-decoration: none;
+}
+
+.headerNavLeftMargin {
+  margin-left: 40px;
+}
+
+.headerRightText {
+  margin: 0;
+  font-weight: normal;
+  margin-left: 40px;
+  font-size: 1rem;
+}
+
+.footer {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 30px;
+  padding: 10px 30px;
+  background-color: #000;
+  z-index: 2;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.powered{
+  text-align: right;
+}
+
+.footertext {
+  font-size: 10px;
+  text-align: left;
+  font-weight: bold;
+  color: #909090;
+  margin-right: 10px;
+
+}
+
+.footerlink{
+  text-decoration: none;
+  font-size: 10px;
+  text-align: left;
+  font-weight: bold;
+  color: #909090;
+}
+
+.footerlogopos {
+  width: auto;
+  height: 15px;
+  margin-right: 5px;
+}
+
+.copy_right {
+  font-size: 10px;
+  color: #909090;
+  font-weight: bold;
+}
+
+/* unified view changes */
+
+/* Wrapper for the toggle button group */
+/* Wrapper for the toggle button group */
+.toggleButtonGroupNew {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #2c2f36; /* Dark background for the button group */
+  border-radius: 30px; /* Rounded container */
+  padding: 0.5rem; /* Padding around the buttons */
+  gap: 0.5rem; /* Space between buttons and divider */
+}
+
+/* Default toggle button styling */
+.toggleButtonNew {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem; /* Space between icon and text */
+  padding: 0.5rem 1.2rem; /* Button padding */
+  border: none; /* No border for individual buttons */
+  border-radius: 25px; /* Fully rounded buttons */
+  background-color: transparent; /* Default background */
+  color: #ccc; /* Inactive text and icon color */
+  text-decoration: none; /* Remove link underline */
+  font-size: 0.9rem; /* Adjust font size */
+  font-weight: 500; /* Slightly bold text */
+  cursor: pointer; /* Pointer cursor */
+  transition: all 0.3s ease; /* Smooth transition */
+}
+
+/* Hover effect for inactive buttons */
+.toggleButtonNew:hover {
+  color: #fff; /* Change text color on hover */
+}
+
+/* Active button styling */
+.toggleButtonActiveNew {
+  background: linear-gradient(to right, #F05C5C, #7C51A0); /* Light grayish background for active button */
+  color: #fff; /* White text and icon for active button */
+  border-radius: 25px; /* Ensure rounded buttons */
+}
+
+/* Icon size adjustment */
+.toggleButtonNew i {
+  font-size: 1rem; /* Adjust icon size */
+}
+
+/* Divider styling */
+.dividerNew {
+  width: 1px;
+  height: 2rem; /* Match the button height */
+  background-color: #555; /* Divider color */
+  margin: 0 0.5rem; /* Space around the divider */
+}
+ 
+.header-div{
+  margin-left: 173px !important;
+}
+
+.creditsbutton{
+  display: flex !important;
+  justify-content: center;
+  align-items: center;
+  border: 1px solid #F7B81C; /* Gold border */
+  border-radius: 25px; /* Oval border */
+  padding: 5px 15px; /* Adjust inner spacing */
+  margin-right: 2rem;
+  width: 15%;
+  background-color: rgb(249, 228, 159); /* Transparent background */
+  cursor: pointer;
+}
+
+.logoutButton {
+  position: absolute;
+  top: 40px;
+  right: 0;
+  padding: 5px 10px;
+  background-color: #ff4d4d;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  font-size: 12px;
+  cursor: pointer;
+  z-index: 100;
+}
+
+.logoutButton:hover {
+  background-color: #ff3333;
+}
+
+.uni-logo {
+  height: 70% !important;
+  width: 50% !important;
+  margin-left: 50% !important;
+}
+.tool-name {
+  background: linear-gradient(to right, #0768ff, #77ff77);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  margin-left:15px
+}
+
+.adminHeader {
+  margin-left: 16%;
+}
+
+
+
+
+
+
+

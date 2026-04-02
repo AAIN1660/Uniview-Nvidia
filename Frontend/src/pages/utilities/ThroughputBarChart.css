@@ -1,0 +1,73 @@
+.chart-wrapper {
+  width: 100%;
+  max-width: 600px;
+  margin: 0 auto;
+  border: 1px solid #ddd;
+  padding: 18px;
+  background-color: #fff;
+  position: relative;
+  margin-top: 23px;
+  border-radius: 7px;
+  margin-right: 45px;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.title {
+  font-size: 1.2em;
+  margin: 0;
+}
+
+.number {
+  font-size: 1.5em;
+  font-weight: bold;
+  background-color: #333;
+  color: #fff;
+  padding: 5px 10px;
+  border-radius: 50%;
+}
+
+.custom-legend {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  margin: 0 10px;
+}
+
+.color-box {
+  width: 8px;
+  height: 8px;
+  margin-right: 5px;
+}
+
+.footer {
+  background-color: #333;
+  color: #fff;
+  padding: 10px;
+  text-align: center;
+  font-size: 1em;
+}
+
+.footer-text {
+  margin: 0;
+  font-size: 1em;
+}
+
+.footer-number {
+  font-size: 1.2em;
+}
+
+.recharts-wrapper {
+  margin-top: -3px;
+}

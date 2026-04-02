@@ -1,0 +1,22 @@
+.workflow-tabs {
+    .chakra-tabs__trigger {
+        border: 1px solid #676e89;
+        margin-right: 8px;
+        border-radius: 5px;
+        width: 600px;
+    }
+    .chakra-tabs__trigger[aria-selected="true"] {
+        background: #676e89;
+        color: white;
+    }
+}
+
+.adddataset-btn{
+    margin-left: 10px;
+    padding: 5px 10px;
+    height: 32px;
+}
+
+.btn-save-index {
+    margin-left: 10px;
+}

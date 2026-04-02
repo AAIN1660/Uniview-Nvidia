@@ -1,0 +1,79 @@
+.users-list {
+    padding: 50px 20px;
+}
+.credit-pool-balance {
+    background-color: #676e89;
+    height: 32px;
+    border-radius: 5px;
+    padding: 5px 10px;
+    width: max-content;
+    color: white;
+}
+
+.loader-center {
+    height: 80vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.creditpool-div{
+    display: flex;
+    justify-content: flex-end;
+    padding: 0px 20px;
+    align-items: center;
+    margin-top: 10px;
+    margin-bottom: 10px;
+}
+
+.adddataset-btn{
+    margin-right: 10px;
+    padding: 5px 10px;
+    height: 32px;
+}
+.active-status{
+    
+
+    background: #D1FFF1;
+    color: green !important;
+    border: 1px solid green;
+}
+
+.badge-inactive{
+    background: red;
+    color: white !important;
+    border: 1px solid red;
+    border-radius: 5px;
+}
+
+.pagination {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 5px;
+    margin-top: 20px;
+    float: right;
+    margin-top: 0px;
+  
+    .btn {
+      border: 1px solid #ddd;
+      padding: 5px 10px;
+      border-radius: 5px;
+      background-color: #fff;
+      color: #333;
+      cursor: pointer;
+      height: 31px;
+      font-size: small;
+  
+      &:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+  
+      &.active {
+        background-color: #004c4c; /* Dark teal */
+        color: #fff;
+      }
+    }
+  }
+  

@@ -1,0 +1,103 @@
+.questionInputContainer {
+    border-radius: 8px;
+    box-shadow: 0px 8px 16px rgba(0, 0, 0, 0.14), 0px 0px 2px rgba(0, 0, 0, 0.12);
+    height: auto;
+    /* Adjust height to accommodate new layout */
+    width: 85% !important;
+    padding: 15px;
+    background: white;
+    display: flex;
+    flex-direction: column;
+    /* Change layout to column */
+}
+
+textarea {
+    height: 84px;
+    background-color: #F5F6F7 !important;
+    padding: 15px !important;
+    font-size: 19px !important;
+    font-family: TT Commons !important;
+}
+
+.questionInputTextArea {
+    width: 100%;
+    line-height: 40px;
+    margin-bottom: 10px; /* Space between text box and buttons */
+    border-radius: 13px;
+    background-color: #F5F6F7; /* Match background color */
+    padding: 0; /* Remove padding */
+    overflow: hidden; /* Clip content to avoid spillage */
+    height: 74px;
+  }
+
+  .questionInputTextArea .field-11{
+    background-color: #F5F6F7;
+  }
+
+  .questionInputTextArea:focus {
+    outline: none ;
+    box-shadow: none !important;
+    border: none !important;
+  }
+  
+
+.questionInputButtonsContainer {
+    display: flex;
+    justify-content: flex-end;
+    /* Align buttons to the right */
+    gap: 10px;
+    /* Add spacing between buttons if needed */
+}
+
+.questionInputSendButton {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: #00CF91 !important;
+    border: none;
+    color: white;
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    font-size: 18px;
+    cursor: pointer;
+    cursor: pointer;
+    margin-top: -13px;
+}
+
+.questionInputSendButtonDisabled {
+    opacity: 0.4;
+}
+.questionInputSendButton {
+    background: linear-gradient(to right, #F05C5C, #7C51A0);
+}
+.checkbox-container {
+    display: flex;
+    align-items: center;
+    font-size: 14px;
+    color: #6b6b6b;
+    width: 32px;
+}
+
+.checkbox-container input {
+    margin-right: 5px;
+    accent-color: #6c3cfa;
+    width: 24px;
+    height: 17px;
+    background-color: green;
+}
+.checkbox-container .checkbox {
+    background-color: green;
+    width: 24px;
+    height: 17px;
+}
+
+
+
+.send-button:hover {
+    background-color: #1ba57a;
+}
+.hasAnswer {
+    margin-bottom: 0px;
+    width: 66.3%;
+  }

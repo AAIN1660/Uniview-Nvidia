@@ -1,0 +1,353 @@
+.chat-answer-container {
+  padding: 10px;
+  /* font-family: Arial, sans-serif; */
+  background-color: #f4f4f5;
+  max-width: 85%;
+  margin: -85px auto 20px;
+  border-radius: 10px;
+  }
+  
+  
+  
+  .chart-section {
+    background-color: #ffffff;
+    border: 1px solid #ddd;
+    border-radius: 15px;
+    /* padding: 20px; */
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    /* margin: 20px auto; */
+    max-width: 100%;
+    text-align: center;
+  }
+
+  .chart-title {
+    font-size: 1.5rem;
+    margin-bottom: 20px;
+    color: #333;
+  }
+  
+  
+  
+  .chart-section h3 {
+    font-size: 1.2rem;
+    margin-bottom: 10px;
+    color: #333;
+  }
+
+  chart-section img {
+    width: 98%;
+    margin: auto;
+  }
+  
+  .sql-section {
+    background-color: #4B4F5B;
+    border-radius: 15px;
+  }
+  
+  .sql-section h3 {
+    font-size: 1.2rem;
+    margin-bottom: 10px;
+    color: #333;
+  }
+  
+  .sql-section pre {
+    font-size: 14px;
+    color: white;
+    padding: 10px;
+    overflow-x: auto;
+    background-color: #4B4F5B;
+    border-radius: 15px;
+  }
+  
+  /* Interactive Section */
+  .interactive-section {
+    margin-top: -11px;
+
+    /* display: flex; */
+    justify-content: space-between;
+    align-items: center;
+  }
+  
+  /* .explanation-bar {
+    background-color: #ddd;
+    padding: 10px;
+    border-radius: 8px;
+    font-size: 1rem;
+    color: #333;
+    flex-grow: 1;
+    margin-right: 10px;
+    cursor: pointer;
+    width: 100%;
+
+  } */
+
+  
+  
+  
+  .actions, .options {
+    display: flex;
+    gap: 10px;
+  }
+  .options{
+    text-align: right;
+    justify-content: flex-end;
+
+  }
+  
+  .icon-button {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 1.5rem;
+  }
+  
+  .icon-button:hover {
+    color: #555;
+  }
+  
+  .link-button {
+    background: none;
+    border: none;
+    color: #6c63ff;
+    font-size: 14px;
+    cursor: pointer;
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+  }
+  
+  .link-button i {
+    margin-right: 5px;
+  }
+  
+  .link-button:hover {
+    color: #4c42cc;
+  }
+
+  /* Tabs for Insights and Python Code */
+.tab-container {
+  display: flex;
+  z-index: 1001; 
+  width: 100%;
+  max-width: 100%; /* Ensure it takes full width */
+  
+}
+
+.tab {
+  padding: 8px 16px;
+  cursor: pointer;
+  font-size: 1rem;
+  color: #666;
+  border-radius: 8px 8px 0 0;
+  margin-right: 8px;
+}
+
+.tab.active {
+  color: #532df5  ;
+  border-bottom: 2px solid #532df5;
+}
+
+/* Icons at the top-right */
+.icon-container {
+ display: flex;
+ gap: 8px;
+}
+
+.icon {
+  font-size: 1.2rem;
+  color: #666;
+  cursor: pointer;
+}
+
+.icon:hover {
+  color: #333;
+}
+
+.text-section{
+  border: 1px solid #ddd;
+  border-radius: 15px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  padding: 15px;
+  background-color: white;
+  font-size: 14px;
+}
+.text-section ul {
+  padding: 0px;
+}
+
+.tabs-icons-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid #ddd;
+  margin-bottom: 10px;
+  padding-bottom: 0px;
+
+}
+
+
+.icon-section{
+  display: flex;
+}
+
+.code-explanation{  
+}
+
+/* Container for the entire citations section */
+.citations-container {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 20px;
+  background-color: white;
+  border-radius: 8px;
+  max-width: 930px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* Title for the citations section */
+.citations-title {
+  font-weight: 600;
+  font-size: 16px;
+  color: #333;
+  margin-bottom: 5px;
+}
+
+/* Grid layout to arrange citation links side by side */
+.citations-list {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr); /* Two files per row */
+  gap: 10px;
+}
+
+/* Individual citation link style */
+.citation-link {
+  padding: 8px 12px;
+  background-color: #ede7ff;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 500;
+  text-decoration: none;
+  color: #6246ea;
+  cursor: pointer;
+  text-align: center;
+  white-space: nowrap;           /* Prevent text from wrapping */
+  overflow: hidden;              /* Hide overflowing text */
+  text-overflow: ellipsis;       /* Show ellipsis (...) for overflowing text */
+  display: block;
+}
+
+/* Hover effect for citation links */
+.citation-link:hover {
+  background-color: #d9c6ff;
+}
+
+.clear-icon{
+  margin-top: 2px;
+  margin-left: 6px;
+}
+.chart-section .grpahimage {
+  border-radius: 15px;
+  width: 97%;
+  margin: auto;
+
+}
+
+/* .explanation-bar{
+  width: 100%;
+  background-color: #858B9D;
+  color
+  : white;
+} */
+
+
+.explanation-bar {
+  background-color: #858B9D;
+  padding: 10px;
+  border-radius: 8px;
+  font-size: 1rem;
+  color: #333;
+  margin-bottom: 10px;
+}
+
+.explanation-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+}
+
+.code-explanation {
+  margin: 0;
+  font-weight: 500;
+  color: white;
+    font-size: 15px;
+}
+
+.icon-wrapper {
+  display: flex;
+  align-items: center;
+  margin-left: 10px;
+}
+
+.sql-explanation {
+  margin-top: 10px;
+  padding: 10px;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  color: #555;
+  line-height: 1.5;
+  color: white;
+}
+.collapse{
+  color: white;
+}
+.expand{
+  color: white;
+}
+
+.download-arrow-icon{
+  border: 1px solid #a9a1a1;
+  padding: 5px 10px;
+  float: right;
+  border-radius: 9px;
+  position: relative;
+    top: 15px;
+    right: 18px;
+    cursor: pointer;
+}
+
+.clear-chat-style{
+  margin-left: 91px;
+  margin-right: -1px;
+}
+
+@media (max-width: 1316px) and (min-width: 1300px) {
+  .clear-chat-style {
+      margin-left: 85px;
+      margin-right: -1px;
+  }
+}
+
+@media (max-width: 1299px) {
+  .clear-chat-style {
+      margin-left: 83px;
+      margin-right: -1px;
+  }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  

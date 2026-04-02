@@ -1,0 +1,176 @@
+/* Container */
+.chat-container {
+    display: flex;
+    height: 100vh;
+    font-family: Arial, sans-serif;
+    overflow: hidden;
+}
+
+/* Sidebar */
+
+
+/* Main Chat Section */
+/* Main Container */
+.chat-main {
+    display: flex;
+    flex-direction: column;
+    justify-content: end;
+    align-items: center;
+    background-color: #f4f4f5;
+    padding: 10px;
+    width: 100%;
+}
+
+.chat-header-content {
+    text-align: center;
+    margin-bottom: 20px;
+    background-color:  #F4F4F4 !important;
+}
+
+.chat-header-content h2 {
+    font-size: 28px;
+    font-weight: bold;
+    color: #000;
+    margin: 0;
+}
+
+.chat-header-content p {
+    font-size: 14px;
+    color: gray;
+    margin: 5px 0 20px;
+}
+
+/* Input Container */
+.chat-input-container {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    max-width: 900px;
+    border: 1px grey;
+    border-radius: 7px;
+    background-color: white;
+    height: 160px;
+
+}
+
+/* Full Width Text Input */
+.chat-input-full {
+    width: 100%;
+    background-color: #f6f6f6;
+    border: none;
+    border-radius: 12px !important;
+    padding: 12px 15px;
+    font-size: 16px;
+    outline: none;
+    color: #333;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    box-sizing: border-box;
+    margin-top:14px;
+}
+
+/* Bottom Section: Checkbox and Icons */
+.chat-bottom {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 10px;
+}
+
+/* Checkbox */
+.checkbox-container {
+    display: flex;
+    align-items: center;
+    font-size: 14px;
+    color: #6b6b6b;
+}
+
+.checkbox-container input {
+    margin-right: 5px;
+    accent-color: #6c3cfa;
+    width: 24px;
+    height: 19px;
+}
+
+/* Icons on the Right */
+.icons-container {
+    display: flex;
+    gap: 10px;
+}
+
+.microphone-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: #f1f2f3;
+    border-radius: 50%;
+    width: 35px;
+    height: 35px;
+    color: #9e9e9e;
+    font-size: 16px;
+    cursor: pointer;
+}
+
+.send-button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: #00CF91 !important;
+    border: none;
+    color: white;
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    font-size: 18px;
+    cursor: pointer;
+}
+
+.send-button:hover {
+    background-color: #1ba57a;
+}
+
+.chat-messages{
+    overflow-y: scroll;
+}
+
+::-webkit-scrollbar {
+    width: 0px;  /* Adjust the width to make the scrollbar thinner */
+    /* height: 0px;  Adjust the width to make the scrollbar thinner */
+  }
+
+::-webkit-scrollbar:hover {
+    width: 4px;  /* Make the scrollbar width 0, effectively hiding it */
+    /* height: 1px; For horizontal scrollbars, set height to 0 */
+  }
+
+.img-icon{
+    margin-left: 145px;
+}
+
+.custom-badge {
+    width: 171px;
+    height: 66px;
+    position: fixed;
+    top: 70px;
+    right: 35px;
+    background: linear-gradient(to right, #F05C5C, #7C51A0);
+    z-index: 1000;
+}
+
+.textcls {
+    font-size: 10px;
+}
+
+.textcls2 {
+    font-size: 10px;
+}
+
+.textcls3 {
+    font-weight: bold;
+    font-size: 11px;
+}
+
+.custom-hover {
+    overflow: visible;
+    width: 162px;
+    height: 132px;
+}

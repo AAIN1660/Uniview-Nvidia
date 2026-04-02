@@ -1,0 +1,33 @@
+.categoryheader {
+    padding: 16px;
+    display: flex;
+    flex-direction: row;
+}
+
+.categorysection {
+  > div {
+    padding-left: 0;
+  }
+}
+
+.hide-pencil {
+  visibility: hidden;
+}
+
+@media only screen and (max-width: 768px){
+    .categoryheader {
+      flex-direction: column;
+      align-items: start;
+      padding: 0;
+    }
+  }
+
+  .pagination {
+    margin-bottom: 30px !important;
+    display: flex !important;
+    
+  }
+
+  table > thead > tr > th{
+    text-align: left !important;
+  }

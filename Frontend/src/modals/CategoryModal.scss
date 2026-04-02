@@ -1,0 +1,45 @@
+.categoryModal{
+
+    width: 28vw;
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    height: 100vh;
+    z-index: 1010 !important;
+    background-color: white;
+    padding: 16px;
+    box-shadow: rgba(0, 0, 0, 0.22) 0px 25.6px 57.6px 0px, rgba(0, 0, 0, 0.18) 0px 4.8px 14.4px 0px;
+
+    .container {
+        display: flex;
+        flex-direction: column;
+
+        > div {
+            flex: 1;
+        }
+
+        label {
+            margin-top: 8px;
+        }
+    }
+  
+}
+
+.p-20{
+    padding:20px;
+}
+
+.float-right{
+	float: right;
+}
+
+.fa-times{
+    cursor: pointer;
+}
+.fa{
+    cursor: pointer;
+}
+.drop{
+    background-color: white !important;
+}

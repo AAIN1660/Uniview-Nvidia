@@ -1,0 +1,18 @@
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+
+#log_file
+/log_files/*
+**.pyc
+Backend/.env
+Backend/lvenv
+
+**/*.pyc
+**/migrations/*.*
+**/__pycache__/*.*
+.env
+lvenv/
+.venv/
+Backend/utility/validation.py
+Backend/key/encrypted_license
+.scannerwork
+venv

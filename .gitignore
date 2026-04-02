@@ -1,0 +1,65 @@
+# ==========================================================
+# Root .gitignore (applies to entire repo)
+# Keep secrets + generated artifacts out of Git
+# ==========================================================
+
+# --- Secrets / environment files ---
+**/unified.env
+**/.env
+**/.env.*
+**/*.env
+**/*.env.*
+
+# Allow committing env templates/examples
+!**/.env.example
+!**/.env*.example
+!**/*.env.example
+!**/*.env*.example
+
+# --- Node / frontend ---
+**/node_modules/
+**/dist/
+**/dist-ssr/
+**/.next/
+**/out/
+**/build/
+**/.turbo/
+**/.cache/
+**/.parcel-cache/
+
+# --- Python / backend ---
+**/__pycache__/
+**/*.py[cod]
+**/.pytest_cache/
+**/.mypy_cache/
+**/.ruff_cache/
+**/.coverage
+**/htmlcov/
+**/.tox/
+**/.nox/
+**/venv/
+**/.venv/
+**/lvenv/
+**/*.egg-info/
+
+# --- Logs ---
+**/logs/
+**/*.log
+
+# --- IDE / OS ---
+**/.vscode/*
+!**/.vscode/extensions.json
+**/.idea/
+**/.DS_Store
+**/Thumbs.db
+**/*.suo
+**/*.ntvs*
+**/*.njsproj
+**/*.sln
+**/*.sw?
+
+# --- Docker ---
+**/.docker/
+
+# --- Misc ---
+**/.scannerwork/

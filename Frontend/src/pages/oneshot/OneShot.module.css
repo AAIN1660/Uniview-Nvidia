@@ -1,0 +1,118 @@
+.oneshotContainer {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    align-items: center;
+    padding-bottom: 32px;
+}
+
+.oneshotTopSection {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+}
+
+.oneshotBottomSection {
+    display: flex;
+    flex: 1;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-content: flex-start;
+    width: 100%;
+    margin-top: 20px;
+}
+
+.oneshotTitle {
+    font-size: 40px;
+    font-weight: 600;
+    margin-top: 130px;
+    margin-bottom: 41px;
+}
+
+@media only screen and (max-width: 800px) {
+    .oneshotTitle {
+        font-size: 3rem;
+        font-weight: 600;
+        margin-top: 0;
+    }
+}
+
+.oneshotQuestionInput {
+    max-width: 800px;
+    width: 100%;
+    padding-left: 10px;
+    padding-right: 10px;
+}
+
+.oneshotAnswerContainer {
+    max-width: 800px;
+    width: 100%;
+    padding-left: 10px;
+    padding-right: 10px;
+}
+
+.oneshotAnalysisPanel {
+    width: 600px;
+    margin-left: 20px;
+}
+
+.oneshotSettingsSeparator {
+    margin-top: 15px;
+    margin-bottom: 16px;
+}
+
+.oneshotSettingsSeparatorSubChoices {
+    margin-top: 8px;
+    margin-left: 22px;
+}
+
+.settingsButton {
+    align-self: flex-end;
+    margin-right: 20px;
+    margin-top: 20px;
+}
+
+.labelWeight {
+    font-weight: 600 !important;
+    margin-bottom: 7px;
+}
+
+.whiteColor {
+ position: relative !important;
+ top: 1px !important;
+}
+.toggleContainer {
+    display: flex;
+    align-items: center;
+  }
+  
+  .leftLabel {
+    margin-right: 10px; 
+    font-size: 15px;
+    text-align: center;
+
+  }
+  
+  .rightLabel {
+    margin-left: 10px; 
+    font-size: 15px;
+    text-align: center;
+
+  }
+  
+  .whiteColor {
+    color: white;
+  }
+
+  .sharepoint-link {
+    display: block; 
+    margin-top: 10px; 
+    color: blue; 
+    text-decoration: none; 
+    font-size: 16px; 
+  }
+  
+  .sharepoint-link:hover {
+    text-decoration: underline; 
+  }
