@@ -1073,6 +1073,105 @@ def parse_agent_content_json(content):
     print("parse_agent_content_json: could not parse JSON from agent message (preview):", s[:400])
     return {}
 
+def build_generic_sql_fallback_answer(messages):
+    """
+    Generic fallback for SQL / Both-dependent flows.
+
+    Does not hardcode business entities, product names, regions, columns, or use cases.
+    It simply uses:
+    1. successful Sql_tool outputs
+    2. latest useful SQL agent explanation / feedback
+    to create a non-empty final answer.
+    """
+    successful_outputs = []
+    useful_texts = []
+    latest_sql_query = ""
+
+    for msg in messages:
+        name = msg.get("name")
+        content = str(msg.get("content") or "").strip()
+
+        if not content:
+            continue
+
+        if name == "Sql_tool":
+            if content.lower() in ("none", "[]"):
+                continue
+            if "An error occurred while execusting the query" in content:
+                continue
+
+            try:
+                rows = json.loads(content)
+                if isinstance(rows, list) and rows:
+                    successful_outputs.append(rows)
+            except Exception:
+                successful_outputs.append(content)
+
+        if name in ("Sql_Generator", "Sql_Execution_Critic", "Insight_Generator"):
+            parsed = parse_agent_content_json(content)
+
+            query = parsed.get("sql_query")
+            if isinstance(query, str) and query.strip():
+                latest_sql_query = query.strip()
+
+            for key in (
+                "sql_answer",
+                "sql_explanation",
+                "feedback",
+                "Inference",
+                "inference",
+                "sql_db_output",
+            ):
+                value = parsed.get(key)
+
+                if value is None:
+                    continue
+
+                if isinstance(value, (list, dict)):
+                    useful_texts.append(json.dumps(value, ensure_ascii=False))
+                    continue
+
+                if isinstance(value, str) and value.strip():
+                    low = value.lower()
+
+                    # Ignore pure error messages as final answer text
+                    if "incorrect syntax" in low:
+                        continue
+                    if "invalid column name" in low:
+                        continue
+                    if "error occurred" in low:
+                        continue
+
+                    useful_texts.append(value.strip())
+
+    if not successful_outputs and not useful_texts:
+        return {"sql_answer": "", "llm_answer": ""}
+
+    sql_parts = []
+
+    if successful_outputs:
+        for idx, rows in enumerate(successful_outputs, start=1):
+            if isinstance(rows, list):
+                preview = json.dumps(rows, ensure_ascii=False)
+            else:
+                preview = str(rows)
+
+            sql_parts.append(f"SQL result {idx}: {preview}")
+
+    sql_answer = "\n".join(sql_parts)
+
+    llm_answer = ""
+    if useful_texts:
+        # Use latest useful interpretation from the agents
+        llm_answer = useful_texts[-1]
+
+    if latest_sql_query and not sql_answer:
+        sql_answer = f"Executed SQL query: {latest_sql_query}"
+
+    return {
+        "sql_answer": sql_answer,
+        "llm_answer": llm_answer,
+    }
 
 def agent_output_jsonparser(chat_history, critic_agent):
     messages = chat_history.chat_history
@@ -1418,10 +1517,37 @@ async def start_agenting_process(query, index_type, filter, explain_code, catego
             elif last_speaker is Sql_tool:
                 return Sql_Execution_Critic
             elif last_speaker is Sql_Execution_Critic:
-                if "Happy with the result" in last_message:
+
+                critic_info = parse_agent_content_json(last_message)
+                evaluation = critic_info.get("sql_critic_evaluation")
+                feedback = str(critic_info.get("feedback") or "").lower()
+                next_step = str(critic_info.get("next_step") or "").lower()
+
+                has_successful_sql_output = False
+                for msg in reversed(messages):
+                    if msg.get("name") == "Sql_tool":
+                        content = str(msg.get("content") or "").strip()
+                        if (
+                            content
+                            and content.lower() not in ("none", "[]")
+                            and "An error occurred while execusting the query" not in content
+                        ):
+                            has_successful_sql_output = True
+                            break
+
+                # If SQL execution succeeded, go to Insight_Generator.
+                if (
+                    "happy with the result" in last_message.lower()
+                    or evaluation == 1
+                    or has_successful_sql_output
+                ):
                     return Insight_Generator
-                else:
-                    return Sql_Generator
+
+                # If the critic says semantic/refinement is needed, move forward instead of looping forever.
+                if "semantic" in feedback or "semantic" in next_step:
+                    return query_transformer
+
+                return Sql_Generator
             elif last_speaker is Insight_Generator:
                 if "Both" in last_message:
                     return query_transformer
@@ -1493,6 +1619,23 @@ async def start_agenting_process(query, index_type, filter, explain_code, catego
                         "sql_answer": _insight.get('sql_answer', None),
                         "llm_answer": ""
                         }
+
+                     # Generic fallback: prevent blank UI when agents produced SQL results
+                     # but final_answer was not populated by Insight_Generator / llm_answer_maker.
+                    if analysis_type in ("SQL-based", "Both-dependent", "Both-independent"):
+                        if not isinstance(final_answer, dict):
+                            final_answer = {
+                                "sql_answer": str(final_answer or ""),
+                                "llm_answer": ""
+                            }
+
+                        sql_empty = not str(final_answer.get("sql_answer") or "").strip()
+                        llm_empty = not str(final_answer.get("llm_answer") or "").strip()
+
+                        if sql_empty and llm_empty:
+                            fallback = build_generic_sql_fallback_answer(chat_history.chat_history)
+                            if fallback.get("sql_answer") or fallback.get("llm_answer"):
+                                final_answer = fallback
                         print('$$$$$$$$$$$$$$$$$$$ $$$$$$$$$$$$$$$$$$$$$$$$$$$$ final_answer ################################################', final_answer)
 
                     if item['name'] == 'Sql_Generator':
@@ -1540,8 +1683,12 @@ async def start_agenting_process(query, index_type, filter, explain_code, catego
                     if item['name'] == "retriever":
                         data_points = item['content']
 
-                    final_answer = sql_answer + '\n' '\n' + llm_answer
-                    
+                    sql_answer = sql_answer or ""
+                    llm_answer = llm_answer or ""
+
+                    if not sql_answer and item.get('name') == 'Insight_Generator':
+                        sql_answer = str(item.get('content') or "")
+
                     final_answer = {
                         "sql_answer": sql_answer,
                         "llm_answer": llm_answer
@@ -1579,7 +1726,26 @@ async def start_agenting_process(query, index_type, filter, explain_code, catego
         print('$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$ formated_final_answer ################################################', formated_final_answer)
         
         
-        response = {"data_points": json.loads(data_points)  , "answer": formated_final_answer, "thoughts": thoughts, "sql_query": sql_query, "token_usage":total_tokens}
+        #response = {"data_points": json.loads(data_points)  , "answer": formated_final_answer, "thoughts": thoughts, "sql_query": sql_query, "token_usage":total_tokens}
+
+        try:
+            if isinstance(data_points, str) and data_points.strip():
+                parsed_data_points = json.loads(data_points)
+            elif isinstance(data_points, dict):
+                parsed_data_points = data_points
+            else:
+                parsed_data_points = {}
+        except Exception as e:
+            print("Warning: unable to parse data_points:", e)
+            parsed_data_points = {}
+
+        response = {
+            "data_points": parsed_data_points,
+            "answer": formated_final_answer,
+            "thoughts": thoughts,
+            "sql_query": sql_query,
+            "token_usage": total_tokens
+        }
         if python_code:
             response["python_code"] = python_code
             response["plot_base64"] = "data:image/png;base64,"+plot_to_base64(python_code)
