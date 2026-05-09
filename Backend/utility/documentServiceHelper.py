@@ -3,7 +3,7 @@ from azure.cosmos import CosmosClient, exceptions
 import os
 
 
-cosmos_connection_string = REMOVED_SECRET
+cosmos_connection_string = os.environ["COSMOS_CONNECTION_STRING"]
 # Create a CosmosClientConfiguration instance with the connection string
 cosmos_client = CosmosClient.from_connection_string(cosmos_connection_string)
 
@@ -25,7 +25,7 @@ config_container = database.get_container_client(config_container_name)
 
 
 def get_blob_container_client():
-    connection_string = "DefaultEndpointsProtocol=https;AccountName=quindevv;AccountKey=TCf3G6j7q9Qq4oT85hh0b/mqs+59pyVju710yzSkH7F+ngOLo3+YyQrs/ydsbTuOLV8kkCsx+Eq1+AStaZHcyw==;EndpointSuffix=core.windows.net"
+    connection_string = os.environ["BLOB_STORAGE_CONNECTION_STRING"]
     blob_service_client = BlobServiceClient.from_connection_string(connection_string)
     container_name = "quin-dev"
     container_client = blob_service_client.get_container_client(container_name)
