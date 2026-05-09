@@ -27,6 +27,15 @@ from azure.storage.blob import BlobServiceClient
 # Configure environment variables
 load_dotenv("unified.env")
 
+def _clean_env(value, default=None):
+	value = value if value is not None else default
+	if value is None:
+		return None
+	value = str(value).strip()
+	if len(value) >= 2 and value[0] == value[-1] and value[0] in ("'", '"'):
+		value = value[1:-1].strip()
+	return value
+
 service_endpoint = os.getenv("AZURE_SEARCH_SERVICE_ENDPOINT")
 index_name = os.getenv("AZURE_SEARCH_INDEX_NAME")
 qa_index_name = os.getenv("AZURE_QA_INDEX_NAME")
@@ -40,20 +49,20 @@ k = int(similar_chunk_count)
 EMBEDDING_MODEL_DEPLOYMENT_NAME = os.getenv("AZURE_OPENAI_EMBEDDING_DEPLOYED_MODEL")
 
 
-COSMOS_DATABASE_NAME = os.environ["COSMOS_DATABASE_NAME"]
-COSMOS_ENDPOINT = os.environ["COSMOS_ENDPOINT"]
-COSMOS_KEY = os.environ["COSMOS_KEY"]
+COSMOS_DATABASE_NAME = _clean_env(os.getenv("COSMOS_DATABASE_NAME"))
+COSMOS_ENDPOINT = _clean_env(os.getenv("COSMOS_ENDPOINT"))
+COSMOS_KEY = _clean_env(os.getenv("COSMOS_KEY"))
 
 
 
 client = CosmosClient(url=COSMOS_ENDPOINT, credential=COSMOS_KEY)
 database = client.get_database_client(COSMOS_DATABASE_NAME)
 
-# Define your container names here
-user_container_name = "gi_users"
-transaction_container_name = "transactions"
-config_container_name = "config"
-upload_container_name = "gi_uploads"
+# Define container names from env (with sane defaults)
+user_container_name = _clean_env(os.getenv("USER_CONTAINER_NAME"), "gi_users")
+transaction_container_name = _clean_env(os.getenv("TRANSACTION_CONTAINER_NAME"), "transactions")
+config_container_name = _clean_env(os.getenv("CONFIG_CONTAINER_NAME"), "config")
+upload_container_name = _clean_env(os.getenv("UPLOAD_CONTAINER_NAME"), "gi_uploads")
 
 # Define your containers
 user_container = database.get_container_client(user_container_name)

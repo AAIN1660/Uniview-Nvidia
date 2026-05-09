@@ -57,7 +57,13 @@ from azure.storage.blob import BlobServiceClient
 import matplotlib.pyplot as plt
 import io
 import shutil
-
+try:
+    from nat.plugins.autogen.llm import nim_autogen
+    NAT_AUTOGEN_AVAILABLE = True
+except Exception as e:
+    print("NeMo Agent Toolkit AutoGen integration not available:", e)
+    nim_autogen = None
+    NAT_AUTOGEN_AVAILABLE = False
 
 
 from pathlib import Path
@@ -107,11 +113,21 @@ api_type = os.getenv("OPENAI_API_TYPE")
 # password = os.getenv('PASSWORD')
 # driver = os.getenv('DRIVER')
 
-host = os.getenv("SQL_HOST")
-database = os.getenv("SQL_DATABASE")
-username = os.getenv("SQL_USERNAME")
-password = os.getenv("SQL_PASSWORD")
-driver = os.getenv("SQL_DRIVER") or "ODBC Driver 18 for SQL Server"
+def _clean_env(value, default=None):
+    value = value if value is not None else default
+    if value is None:
+        return None
+    value = str(value).strip()
+    if len(value) >= 2 and value[0] == value[-1] and value[0] in ("'", '"'):
+        value = value[1:-1].strip()
+    return value
+
+
+host = _clean_env(os.getenv("SQL_HOST"))
+database = _clean_env(os.getenv("SQL_DATABASE"))
+username = _clean_env(os.getenv("SQL_USERNAME"))
+password = _clean_env(os.getenv("SQL_PASSWORD"))
+driver = _clean_env(os.getenv("SQL_DRIVER"), "ODBC Driver 18 for SQL Server")
 category_name = os.getenv("SQL_SCHEMA") or "dbo"
 if not all([host, database, username, password]):
     raise ValueError("SQL credentials missing. Set SQL_HOST, SQL_DATABASE, SQL_USERNAME, SQL_PASSWORD in unified.env")
@@ -122,7 +138,11 @@ table_name = ["marsdata","unified_HR_data","healthcare_patient_details","healthc
 connection_string = f'mssql+pyodbc:///?odbc_connect={urllib.parse.quote_plus(f"DRIVER={driver};SERVER={host};DATABASE={database};UID={username};PWD={password}")}'
 
 # Create the SQLAlchemy engine
-engine = create_engine(connection_string)
+try:
+    engine = create_engine(connection_string)
+except Exception as _engine_exc:
+    print("SQL engine initialization failed at startup:", _engine_exc)
+    engine = None
 
 # Step 2: Fetch tables from the specified schema dynamically
 def get_schema_tables(engine, schema_name):
@@ -146,7 +166,11 @@ def get_schema_tables(engine, schema_name):
     return schema_details
 
 # Fetch tables from the dynamically specified schema
-all_table_schemas = get_schema_tables(engine,category_name)
+try:
+    all_table_schemas = get_schema_tables(engine, category_name) if engine is not None else ""
+except Exception as _schema_exc:
+    print("Initial SQL schema load failed; continuing without startup schema:", _schema_exc)
+    all_table_schemas = ""
 
 print(all_table_schemas)
 
@@ -188,25 +212,39 @@ client = get_embedding_client()
 
 # model = os.getenv('MODEL')
 
-NVIDIA_BASE_URL = (os.getenv("NVIDIA_BASE_URL") or "https://integrate.api.nvidia.com/v1").strip()
-NVIDIA_MODEL = (os.getenv("NVIDIA_MODEL") or "meta/llama-3.3-70b-instruct").strip()
-NVIDIA_API_KEY = (os.getenv("NVIDIA_API_KEY") or "").strip()
+NVIDIA_BASE_URL = _clean_env(os.getenv("NVIDIA_BASE_URL"), "https://integrate.api.nvidia.com/v1")
+NVIDIA_MODEL = _clean_env(os.getenv("NVIDIA_MODEL"), "meta/llama-3.3-70b-instruct")
+NVIDIA_API_KEY = _clean_env(os.getenv("NVIDIA_API_KEY"), "")
 
 if not NVIDIA_API_KEY:
     raise ValueError("NVIDIA_API_KEY is required in unified.env")
 
-llm_config = {
-    "config_list": [
-        {
-            "model": NVIDIA_MODEL,
-            "api_type": "openai",
-            "base_url": NVIDIA_BASE_URL,
-            "api_key": NVIDIA_API_KEY,
-        }
-    ],
-    "cache_seed": None,
-    "temperature": 0.1,
-}
+# llm_config = {
+#     "config_list": [
+#         {
+#             "model": NVIDIA_MODEL,
+#             "api_type": "openai",
+#             "base_url": NVIDIA_BASE_URL,
+#             "api_key": NVIDIA_API_KEY,
+#         }
+#     ],
+#     "cache_seed": None,
+#     "temperature": 0.1,
+# }
+
+USE_NEMO_AUTOGEN_SERVICE = (
+    _clean_env(os.getenv("USE_NEMO_AUTOGEN_SERVICE"), "true").lower() == "true"
+)
+
+if USE_NEMO_AUTOGEN_SERVICE:
+    from utility.nemo_autogen_service import get_nemo_autogen_llm_config
+
+    # Keep full AutoGen orchestration unchanged; only replace LLM backend config for NIM integration.
+    llm_config = get_nemo_autogen_llm_config()
+else:
+    from utility.nemo_autogen_service import get_direct_nvidia_llm_config
+
+    llm_config = get_direct_nvidia_llm_config()
 
 
 def total_tokens_from_autogen_cost(chat_history):
@@ -503,7 +541,7 @@ You are the Sql_tool Agent. Your job is to take the SQL query given by the Sql_E
 2. **Execute the execute_query function and pass the output to Insight_Generator agent**
     """,
     max_consecutive_auto_reply=3,
-    llm_config=None,
+    llm_config=llm_config,
     human_input_mode="NEVER"
 )
 
@@ -1015,9 +1053,50 @@ def plot_to_base64(plot_code):
        
         # Clean up the plot code if necessary
         plot_code = plot_code.replace("plt.show()", " ")  # Prevent plt.show() from blocking execution
-       
-        # Execute the provided plot code
-        exec(plot_code)
+
+        # Run generated code inside an explicit context so symbols like
+        # pd/plt/sns/df resolve consistently during lambdas/comprehensions.
+        exec_ctx = {
+            "pd": pd,
+            "plt": plt,
+            "sns": sns,
+        }
+        try:
+            exec(plot_code, exec_ctx, exec_ctx)
+        except Exception as exec_err:
+            # Common model bug: label lambda uses undefined index variable.
+            # Drop that fragile line and rely on generic bar annotations.
+            print(f"Plot code primary exec failed: {exec_err}. Retrying with safe label fallback.")
+            safe_lines = []
+            for line in plot_code.splitlines():
+                stripped = line.strip()
+                if ".apply(lambda" in stripped and "plt.text(" in stripped:
+                    continue
+                safe_lines.append(line)
+            safe_code = "\n".join(safe_lines)
+            plt.clf()
+            plt.figure(figsize=(8, 6))
+            exec(safe_code, exec_ctx, exec_ctx)
+
+        # Generic value labels for bar plots if bars exist.
+        ax = plt.gca()
+        if getattr(ax, "patches", None):
+            for patch in ax.patches:
+                height = patch.get_height()
+                if height is None:
+                    continue
+                try:
+                    label = f"{float(height):,.0f}"
+                except Exception:
+                    label = str(height)
+                ax.annotate(
+                    label,
+                    (patch.get_x() + patch.get_width() / 2.0, height),
+                    ha="center",
+                    va="bottom",
+                    xytext=(0, 4),
+                    textcoords="offset points",
+                )
        
         # Ensure that the layout of the plot is not cropped
         plt.tight_layout()
@@ -1055,21 +1134,48 @@ def parse_agent_content_json(content):
         return json.loads(s)
     except json.JSONDecodeError:
         pass
-    start = s.find("{")
-    if start == -1:
-        return {}
-    depth = 0
-    for i in range(start, len(s)):
-        if s[i] == "{":
-            depth += 1
-        elif s[i] == "}":
-            depth -= 1
-            if depth == 0:
-                chunk = s[start : i + 1]
-                try:
-                    return json.loads(chunk)
-                except json.JSONDecodeError:
-                    break
+
+    # Trying decoding the first JSON object found inside mixed text.
+    decoder = json.JSONDecoder()
+    for i, ch in enumerate(s):
+        if ch != "{":
+            continue
+        try:
+            obj, _end = decoder.raw_decode(s[i:])
+            if isinstance(obj, dict):
+                return obj
+        except json.JSONDecodeError:
+            continue
+
+    # Resilient fallback for JSON-like messages with malformed string escaping.
+    parsed = {}
+    import re
+
+    m = re.search(r'"analysis_type"\s*:\s*"([^"]+)"', s, re.DOTALL)
+    if m:
+        parsed["analysis_type"] = m.group(1).strip()
+
+    m = re.search(r'"sql_critic_evaluation"\s*:\s*([01])', s, re.DOTALL)
+    if m:
+        parsed["sql_critic_evaluation"] = int(m.group(1))
+
+    m = re.search(r'"sql_query"\s*:\s*(null|"[^"]*")', s, re.DOTALL)
+    if m:
+        raw = m.group(1).strip()
+        parsed["sql_query"] = None if raw == "null" else raw.strip('"')
+
+    for key in ("feedback", "sql_explanation", "sql_db_output"):
+        m = re.search(
+            rf'"{key}"\s*:\s*"(.*?)"\s*(?:,\s*"[a-zA-Z_]+"|\s*\}})',
+            s,
+            re.DOTALL,
+        )
+        if m:
+            parsed[key] = m.group(1).strip()
+
+    if parsed:
+        return parsed
+
     print("parse_agent_content_json: could not parse JSON from agent message (preview):", s[:400])
     return {}
 
@@ -1205,6 +1311,8 @@ def agent_output_jsonparser(chat_history, critic_agent):
 async def start_agenting_process(query, index_type, filter, explain_code, category, email):
     if query:
         start = time.time() 
+        agent_latency = {}
+        _agent_last_ts = time.time()
         category = '0d49bd7c-6004-4664-bb79-3c1dc342a5b7'
         # print('***********************filter*******************', filter)
         # print('***********************category ***********', category)
@@ -1214,7 +1322,52 @@ async def start_agenting_process(query, index_type, filter, explain_code, catego
         print('&&&&&&&&&&&&&&&&&&&&&&&&&&&&&& all_table_schemas &&&&&&&&&&&&&&&&&&&&&&&&&&&&&&', user_seleted_tables)
         
         
-        all_table_schemas = get_sql_table_schema(connection_string,user_seleted_tables['tables_list'])
+        selected_tables = []
+        if isinstance(user_seleted_tables, dict):
+            selected_tables = user_seleted_tables.get("tables_list") or []
+
+        # If user profile has no table selections, fall back to full SQL schema.
+        if not selected_tables:
+            if engine is not None:
+                selected_tables = inspect(engine).get_table_names(schema=category_name)
+                if not selected_tables:
+                    selected_tables = inspect(engine).get_table_names()
+
+        all_table_schemas = get_sql_table_schema(connection_string, selected_tables)
+
+        if (
+            not all_table_schemas
+            or (isinstance(all_table_schemas, dict) and len(all_table_schemas) == 0)
+            or (isinstance(all_table_schemas, str) and all_table_schemas.lower().startswith("error"))
+        ):
+            # Try schema-scoped DDL-style metadata first.
+            if engine is not None:
+                all_table_schemas = get_schema_tables(engine, category_name)
+
+        if not all_table_schemas:
+            # Final fallback: introspect across all accessible schemas and build
+            # a compact table->columns map so SQL agents always receive metadata.
+            try:
+                if engine is None:
+                    raise RuntimeError("SQL engine unavailable")
+                inspector = inspect(engine)
+                all_schema_dict = {}
+                for schema_name in inspector.get_schema_names():
+                    if not schema_name or schema_name.startswith("db_"):
+                        continue
+                    table_names = inspector.get_table_names(schema=schema_name)
+                    for tbl in table_names:
+                        try:
+                            cols = inspector.get_columns(tbl, schema=schema_name)
+                            all_schema_dict[f"{schema_name}.{tbl}"] = {
+                                col["name"]: str(col["type"]) for col in cols
+                            }
+                        except Exception:
+                            continue
+                if all_schema_dict:
+                    all_table_schemas = all_schema_dict
+            except Exception as schema_exc:
+                print("Cross-schema introspection fallback failed:", schema_exc)
         
         
         print('&&&&&&&&&&&&&&&&&&&&&&&&&&&&&& all_table_schemas &&&&&&&&&&&&&&&&&&&&&&&&&&&&&&', all_table_schemas)
@@ -1380,7 +1533,7 @@ async def start_agenting_process(query, index_type, filter, explain_code, catego
         2. **Execute the execute_query function**
             """,
             max_consecutive_auto_reply=3,
-            llm_config=None,
+            llm_config=llm_config,
             human_input_mode="NEVER"
         )
 
@@ -1495,8 +1648,15 @@ async def start_agenting_process(query, index_type, filter, explain_code, catego
         )
         
         def state_transition(last_speaker, groupchat):
+            nonlocal _agent_last_ts
             messages = groupchat.messages
             last_message = messages[-1]["content"]
+            speaker_name = getattr(last_speaker, "name", str(last_speaker))
+            now_ts = time.time()
+            elapsed = now_ts - _agent_last_ts
+            _agent_last_ts = now_ts
+            agent_latency[speaker_name] = agent_latency.get(speaker_name, 0.0) + elapsed
+            print(f"[latency][agent] {speaker_name} step_sec={elapsed:.3f} cumulative_sec={agent_latency[speaker_name]:.3f}")
             
             # If the last message is from the user proxy, proceed to routing agent
             if last_speaker is user_proxy:
@@ -1577,6 +1737,8 @@ async def start_agenting_process(query, index_type, filter, explain_code, catego
         )
         # autogen.runtime_logging.stop()
         end = time.time()
+        print("[latency][agent] summary_sec=", {k: round(v, 3) for k, v in agent_latency.items()})
+        print(f"[latency][agent] total_orchestration_sec={end - start:.3f}")
         sql_query = ""
         sql_explanation = ""
         data_points="{}"
@@ -1615,9 +1777,17 @@ async def start_agenting_process(query, index_type, filter, explain_code, catego
                         sql_query = _insight.get('sql_query', None)
                         print('$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$ sql_query ################################################', sql_query)
 
+                        # Preserve narrative insight text in SQL flows.
+                        insight_text = (
+                            _insight.get('Inference')
+                            or _insight.get('llm_answer')
+                            or _insight.get('insight')
+                            or ""
+                        )
+
                         final_answer = {
                         "sql_answer": _insight.get('sql_answer', None),
-                        "llm_answer": ""
+                        "llm_answer": insight_text
                         }
 
                      # Generic fallback: prevent blank UI when agents produced SQL results
@@ -1748,7 +1918,12 @@ async def start_agenting_process(query, index_type, filter, explain_code, catego
         }
         if python_code:
             response["python_code"] = python_code
-            response["plot_base64"] = "data:image/png;base64,"+plot_to_base64(python_code)
+            generated_plot = plot_to_base64(python_code)
+            if generated_plot:
+                response["plot_base64"] = "data:image/png;base64," + generated_plot
+            else:
+                # Keep response successful even if generated python plot code fails.
+                print("Plot generation failed; continuing without plot_base64.")
         if sql_code_explanation:
             response["sql_explanation"] = sql_explanation
             if python_code_explanation:
@@ -1763,6 +1938,6 @@ async def start_agenting_process(query, index_type, filter, explain_code, catego
     if os.path.isdir(cache_path):
         shutil.rmtree(cache_path)
         print(f"Deleted directory: {cache_path}")
-    else:
-        print(f"No directory found at: {cache_path}")
+    response["agent_latencies"] = {k: round(v, 3) for k, v in agent_latency.items()}
+    response["orchestration_total_latency_sec"] = round(end - start, 3)
     return response

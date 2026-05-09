@@ -393,11 +393,6 @@ async def refresh_db_schema(request: createDbConnection):
 async def get_user_tables(email: str):
     try:
         user_tables = get_tables_list_by_email(email)
-
-        # Check if an error occurred (e.g., user not found)
-        if "error" in user_tables:
-            return JSONResponse(content=user_tables, status_code=404)
-
         return JSONResponse(content=user_tables)
     
     except Exception as e:

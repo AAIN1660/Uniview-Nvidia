@@ -55,58 +55,41 @@ AZURE_SEARCH_ADMIN_KEY = os.getenv("AZURE_SEARCH_ADMIN_KEY")
 
 BLOB_STORAGE_CONTAINER_NAME = os.getenv('BLOB_STORAGE_CONTAINER_NAME')
 
+def _create_container_compat(database, container_id: str):
+	"""
+	Create container in a way compatible with both provisioned-throughput and
+	serverless Cosmos accounts.
+	"""
+	base_kwargs = {
+		"id": container_id,
+		"partition_key": PartitionKey(path="/id"),
+	}
+	try:
+		return database.create_container_if_not_exists(
+			**base_kwargs,
+			offer_throughput=400
+		)
+	except exceptions.CosmosHttpResponseError as exc:
+		msg = str(exc).lower()
+		if "serverless" in msg and "throughput" in msg:
+			return database.create_container_if_not_exists(**base_kwargs)
+		raise
+
+
 async def create_service():
 
 	# Create Cosmos DB & Containers
 	client = get_cosmos_client()
 	database = client.create_database_if_not_exists(id=COSMOS_DB_NAME)
 
-	user_container = database.create_container_if_not_exists(
-		id=USER_CONTAINER_NAME,
-		partition_key=PartitionKey(path="/id"),
-		offer_throughput=400
-	)
-
-	transaction_container = database.create_container_if_not_exists(
-		id=TRANSACTION_CONTAINER_NAME,
-		partition_key=PartitionKey(path="/id"),
-		offer_throughput=400
-	)
-
-	config_container = database.create_container_if_not_exists(
-		id=CONFIG_CONTAINER_NAME,
-		partition_key=PartitionKey(path="/id"),
-		offer_throughput=400
-	)
-
-	category_container = database.create_container_if_not_exists(
-		id=CATEGORY_CONTAINER_NAME,
-		partition_key=PartitionKey(path="/id"),
-		offer_throughput=400
-	)
-	qa_container = database.create_container_if_not_exists(
-		id=QA_CONTAINER_NAME,
-		partition_key=PartitionKey(path="/id"),
-		offer_throughput=400
-	)
-
-	upload_container = database.create_container_if_not_exists(
-		id=UPLOAD_CONTAINER_NAME,
-		partition_key=PartitionKey(path="/id"),
-		offer_throughput=400
-	)
-
-	db_connection = database.create_container_if_not_exists(
-		id="db_connection",
-		partition_key=PartitionKey(path="/id"),
-		offer_throughput=400
-	)
-
-	data_dictionary = database.create_container_if_not_exists(
-		id="data_dictionary",
-		partition_key=PartitionKey(path="/id"),
-		offer_throughput=400
-	)
+	user_container = _create_container_compat(database, USER_CONTAINER_NAME)
+	transaction_container = _create_container_compat(database, TRANSACTION_CONTAINER_NAME)
+	config_container = _create_container_compat(database, CONFIG_CONTAINER_NAME)
+	category_container = _create_container_compat(database, CATEGORY_CONTAINER_NAME)
+	qa_container = _create_container_compat(database, QA_CONTAINER_NAME)
+	upload_container = _create_container_compat(database, UPLOAD_CONTAINER_NAME)
+	db_connection = _create_container_compat(database, "db_connection")
+	data_dictionary = _create_container_compat(database, "data_dictionary")
 
 	print("-----COSMOS CONTAINERS CREATED-----")
 	await create_superadmin(user_container)

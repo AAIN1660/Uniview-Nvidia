@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "unified-nat-autogen"
+version = "0.1.0"
+requires-python = ">=3.11,<3.14"
+dependencies = [
+  "nvidia-nat[autogen]",
+  "autogen-agentchat",
+  "autogen-ext",
+  "pandas",
+  "sqlalchemy",
+  "pyodbc",
+  "pydantic",
+  "pyyaml",
+  "httpx"
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[project.entry-points.'nat.plugins']
+unified_nat_autogen = "unified_nat_autogen.register"

@@ -677,13 +677,13 @@ def get_tables_list_by_email(email: str):
     user_items = list(user_container.query_items(query=user_query, enable_cross_partition_query=True))
     
     if not user_items:
-        return {"error": "User not found"}
+        return {"email": email, "tables_list": [], "selected_database": ""}
     
     user = user_items[0]
     
-    selectedTables = user['tables_list']
+    selectedTables = user.get('tables_list', []) or []
     
-    selectedDatabase = user['db_connection_id']
+    selectedDatabase = user.get('db_connection_id', "") or ""
     
         
     print('tables', type(selectedTables)) 

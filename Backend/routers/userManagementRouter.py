@@ -20,18 +20,28 @@ from datetime import datetime, timezone, timedelta
 
 router = APIRouter()
 
-COSMOS_DATABASE_NAME = os.environ["COSMOS_DATABASE_NAME"]
-COSMOS_ENDPOINT = os.environ["COSMOS_ENDPOINT"]
-COSMOS_KEY = os.environ["COSMOS_KEY"]
+def _clean_env(value, default=None):
+    value = value if value is not None else default
+    if value is None:
+        return None
+    value = str(value).strip()
+    if len(value) >= 2 and value[0] == value[-1] and value[0] in ("'", '"'):
+        value = value[1:-1].strip()
+    return value
+
+
+COSMOS_DATABASE_NAME = _clean_env(os.getenv("COSMOS_DATABASE_NAME"))
+COSMOS_ENDPOINT = _clean_env(os.getenv("COSMOS_ENDPOINT"))
+COSMOS_KEY = _clean_env(os.getenv("COSMOS_KEY"))
 
 
 client = CosmosClient(url=COSMOS_ENDPOINT, credential=COSMOS_KEY)
 database = client.get_database_client(COSMOS_DATABASE_NAME)
-tran_container = database.get_container_client("transactions")
-user_container = database.get_container_client("gi_users")
-uploads_container = database.get_container_client("gi_uploads")
-config_container = database.get_container_client("config")
-qa_container = database.get_container_client("gi_qa")
+tran_container = database.get_container_client(_clean_env(os.getenv("TRANSACTION_CONTAINER_NAME"), "transactions"))
+user_container = database.get_container_client(_clean_env(os.getenv("USER_CONTAINER_NAME"), "gi_users"))
+uploads_container = database.get_container_client(_clean_env(os.getenv("UPLOAD_CONTAINER_NAME"), "gi_uploads"))
+config_container = database.get_container_client(_clean_env(os.getenv("CONFIG_CONTAINER_NAME"), "config"))
+qa_container = database.get_container_client(_clean_env(os.getenv("QA_CONTAINER_NAME"), "gi_qa"))
 
 
 class UserData(BaseModel):
@@ -559,8 +569,8 @@ async def updateroleandtransactions(
             # print('datatables_list',  data['selectedtables'])
             document_to_update = items[0]
             # print('document_to_update', document_to_update)
-            document_to_update['categories'] = data['categories']
-            document_to_update['tables_list'] = data['selectedtables']
+            document_to_update['categories'] = data.get('categories', document_to_update.get('categories', []))
+            document_to_update['tables_list'] = data.get('selectedtables', document_to_update.get('tables_list', []))
             # Only update the password if it's provided in the request
             if 'password' in data and data['password']:
                 document_to_update['password'] = encrypt_password(data['password'])

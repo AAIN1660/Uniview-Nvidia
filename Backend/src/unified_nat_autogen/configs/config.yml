@@ -1,0 +1,37 @@
+general:
+  telemetry:
+    logging:
+      console:
+        _type: console
+        level: info
+
+llms:
+  unified_nim_llm:
+    _type: nim
+    model_name: ${NVIDIA_MODEL}
+    api_key: ${NVIDIA_API_KEY}
+    base_url: ${NVIDIA_BASE_URL}
+    temperature: 0.1
+    max_tokens: 2048
+
+functions:
+  execute_sql_query:
+    _type: unified_nat_autogen/execute_sql_query
+    description: Execute SQL Server query against configured SQL database.
+
+  retrieve_context:
+    _type: unified_nat_autogen/retrieve_context
+    description: Retrieve semantic context from vector, graph, or hybrid source.
+
+workflow:
+  _type: unified_autogen_team
+  llm_name: unified_nim_llm
+  tool_names:
+    - execute_sql_query
+    - retrieve_context
+
+  default_index_type: hybrid
+  default_filter: ""
+  default_explain_code: false
+  default_category: ""
+  default_email: ""

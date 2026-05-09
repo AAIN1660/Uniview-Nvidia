@@ -1,7 +1,8 @@
 import uvicorn
 import os
+import json
+import httpx
 import logging
-import os
 import aiohttp
 import openai
 import ast
@@ -29,6 +30,7 @@ from urllib.parse import unquote_plus
 from azure.storage.blob import BlobServiceClient
 import io
 import asyncio
+import time
 from contextlib import asynccontextmanager
 from utility.inference import *
 from utility.acsServiceHelper import qna_indexing
@@ -36,31 +38,44 @@ from utility.acsServiceHelper import qna_indexing
 
 load_dotenv("unified.env")
 
+def _clean_env(value, default=None):
+    value = value if value is not None else default
+    if value is None:
+        return None
+    value = str(value).strip()
+    if len(value) >= 2 and value[0] == value[-1] and value[0] in ("'", '"'):
+        value = value[1:-1].strip()
+    return value
+
+
+# NAT-only mode: always route generation through NeMo Agent Toolkit workflow.
+USE_NAT_WORKFLOW = True
+NAT_WORKFLOW_URL = _clean_env(os.getenv("NAT_WORKFLOW_URL"), "http://127.0.0.1:8090/generate")
 # Set logging level to ERROR or CRITICAL
 logging.getLogger('azure.core.pipeline.policies.http_logging_policy').setLevel(logging.ERROR)
 logging.getLogger('azure.monitor.opentelemetry.exporter.export._base').setLevel(logging.ERROR)
 
-AZURE_SEARCH_SERVICE_ENDPOINT = os.getenv("AZURE_SEARCH_SERVICE_ENDPOINT")
-AZURE_SEARCH_INDEX = os.getenv("AZURE_SEARCH_INDEX_NAME")
-AZURE_QNA_INDEX = os.getenv("AZURE_QA_INDEX_NAME")
-AZURE_SHARE_POINT_INDEXR_NAME = os.getenv("AZURE_SHARE_POINT_INDEXR_NAME")
-AZURE_SHARE_POINT_INDEXES_NAME = os.getenv("AZURE_SHARE_POINT_INDEXES_NAME")
-AZURE_SEARCH_ADMIN_KEY = os.getenv("AZURE_SEARCH_ADMIN_KEY")
-AZURE_OPENAI_SERVICE_BASE = os.getenv("AZURE_OPENAI_API_BASE")
-AZURE_OPENAI_VERSION = os.getenv("AZURE_OPENAI_API_VERSION")
-AZURE_OPENAI_TYPE = os.getenv("OPENAI_API_TYPE")
-AZURE_OPENAI_CHATGPT_DEPLOYMENT = os.getenv("GPT3_LLM_MODEL_DEPLOYMENT_NAME")
-AZURE_OPENAI_CHATGPT_MODEL = os.getenv("GPT3_LLM_MODEL_NAME")
-AZURE_OPENAI_EMB_DEPLOYMENT = os.getenv("AZURE_OPENAI_EMBEDDING_DEPLOYED_MODEL")
-AZURE_OPENAI_KEY = os.getenv("AZURE_OPENAI_API_KEY")
+AZURE_SEARCH_SERVICE_ENDPOINT = _clean_env(os.getenv("AZURE_SEARCH_SERVICE_ENDPOINT"))
+AZURE_SEARCH_INDEX = _clean_env(os.getenv("AZURE_SEARCH_INDEX_NAME"))
+AZURE_QNA_INDEX = _clean_env(os.getenv("AZURE_QA_INDEX_NAME"))
+AZURE_SHARE_POINT_INDEXR_NAME = _clean_env(os.getenv("AZURE_SHARE_POINT_INDEXR_NAME"))
+AZURE_SHARE_POINT_INDEXES_NAME = _clean_env(os.getenv("AZURE_SHARE_POINT_INDEXES_NAME"))
+AZURE_SEARCH_ADMIN_KEY = _clean_env(os.getenv("AZURE_SEARCH_ADMIN_KEY"))
+AZURE_OPENAI_SERVICE_BASE = _clean_env(os.getenv("AZURE_OPENAI_API_BASE"))
+AZURE_OPENAI_VERSION = _clean_env(os.getenv("AZURE_OPENAI_API_VERSION"))
+AZURE_OPENAI_TYPE = _clean_env(os.getenv("OPENAI_API_TYPE"))
+AZURE_OPENAI_CHATGPT_DEPLOYMENT = _clean_env(os.getenv("GPT3_LLM_MODEL_DEPLOYMENT_NAME"))
+AZURE_OPENAI_CHATGPT_MODEL = _clean_env(os.getenv("GPT3_LLM_MODEL_NAME"))
+AZURE_OPENAI_EMB_DEPLOYMENT = _clean_env(os.getenv("AZURE_OPENAI_EMBEDDING_DEPLOYED_MODEL"))
+AZURE_OPENAI_KEY = _clean_env(os.getenv("AZURE_OPENAI_API_KEY"))
 KB_FIELDS_CONTENT = 'content'
 KB_FIELDS_SOURCEPAGE = 'sourcepage'
 
 
-COSMOS_DATABASE_NAME = os.environ["COSMOS_DATABASE_NAME"]
-COSMOS_ENDPOINT = os.environ["COSMOS_ENDPOINT"]
-COSMOS_KEY = os.environ["COSMOS_KEY"]
-TOKEN_PER_CREDIT = os.getenv("TOKEN_PER_CREDIT")
+COSMOS_DATABASE_NAME = _clean_env(os.getenv("COSMOS_DATABASE_NAME"))
+COSMOS_ENDPOINT = _clean_env(os.getenv("COSMOS_ENDPOINT"))
+COSMOS_KEY = _clean_env(os.getenv("COSMOS_KEY"))
+TOKEN_PER_CREDIT = _clean_env(os.getenv("TOKEN_PER_CREDIT"))
 
 client = CosmosClient(url=COSMOS_ENDPOINT, credential=COSMOS_KEY)
 database = client.get_database_client(COSMOS_DATABASE_NAME)
@@ -70,14 +85,40 @@ azure_search_credential = AzureKeyCredential(key)
 feedback_container = database.get_container_client("gi_qa")
 search_client = SearchClient(endpoint=AZURE_SEARCH_SERVICE_ENDPOINT,index_name=AZURE_SEARCH_INDEX, credential=azure_search_credential)
 search_client_share_point = SearchClient(endpoint=AZURE_SEARCH_SERVICE_ENDPOINT,index_name=AZURE_SHARE_POINT_INDEXES_NAME,indexes_name =AZURE_SHARE_POINT_INDEXES_NAME,credential=azure_search_credential )
-storage_connection_string = os.getenv("BLOB_STORAGE_CONNECTION_STRING")
-container_name = os.getenv("BLOB_STORAGE_CONTAINER_NAME")
+storage_connection_string = _clean_env(os.getenv("BLOB_STORAGE_CONNECTION_STRING"))
+container_name = _clean_env(os.getenv("BLOB_STORAGE_CONTAINER_NAME"))
+
+COSMOS_CONTAINER_NAMES = {
+    "config": _clean_env(os.getenv("CONFIG_CONTAINER_NAME"), "config"),
+    "category": _clean_env(os.getenv("CATEGORY_CONTAINER_NAME"), "gi_category"),
+    "qa": _clean_env(os.getenv("QA_CONTAINER_NAME"), "gi_qa"),
+    "upload": _clean_env(os.getenv("UPLOAD_CONTAINER_NAME"), "gi_uploads"),
+    "user": _clean_env(os.getenv("USER_CONTAINER_NAME"), "gi_users"),
+    "transaction": _clean_env(os.getenv("TRANSACTION_CONTAINER_NAME"), "transactions"),
+}
+
+
+def _validate_cosmos_configuration() -> None:
+    """Log/validate Cosmos DB resources at startup."""
+    print(
+        "[cosmos] endpoint=", COSMOS_ENDPOINT,
+        " database=", COSMOS_DATABASE_NAME,
+        " containers=", COSMOS_CONTAINER_NAMES,
+    )
+    try:
+        database.read()
+        for container_name in COSMOS_CONTAINER_NAMES.values():
+            database.get_container_client(container_name).read()
+        print("[cosmos] validation succeeded.")
+    except Exception as exc:
+        print("[cosmos] validation failed:", exc)
 
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Run at startup
+    _validate_cosmos_configuration()
     asyncio.create_task(setupService.create_service())
     yield
     # Run on shutdown (if required)
@@ -98,18 +139,250 @@ app.add_middleware(
 def datatimeupdate():
     return datetime.datetime.now()
 
+def try_parse_final_answer(value):
+    """
+    Extracts final_answer JSON from NAT / AutoGen output.
+    Handles raw strings, markdown fences, and APPROVE suffix.
+    """
+    if isinstance(value, dict):
+        if "final_answer" in value:
+            return value
+        return None
 
+    text = str(value or "").strip()
+
+    if not text:
+        return None
+
+    text = text.replace("```json", "").replace("```", "").strip()
+    text = text.replace("APPROVE", "").strip()
+
+    try:
+        parsed = json.loads(text)
+        if isinstance(parsed, dict) and "final_answer" in parsed:
+            return parsed
+    except Exception:
+        pass
+
+    start = text.find("{")
+    end = text.rfind("}")
+
+    if start != -1 and end != -1 and end > start:
+        try:
+            parsed = json.loads(text[start:end + 1])
+            if isinstance(parsed, dict) and "final_answer" in parsed:
+                return parsed
+        except Exception:
+            pass
+
+    return None
+
+
+def normalize_nat_answer(nat_payload):
+    """
+    Converts NAT response into the same answer format expected by the UI:
+    {
+      "final_answer": [
+        {"type": "sql", "text": "..."},
+        {"type": "llm", "text": "..."}
+      ]
+    }
+    """
+
+    # Case 1: NAT directly returns {"final_answer": [...]}
+    if isinstance(nat_payload, dict) and "final_answer" in nat_payload:
+        return nat_payload
+
+    # Case 2: NAT returns {"answer": {"final_answer": [...]}}
+    if isinstance(nat_payload, dict) and isinstance(nat_payload.get("answer"), dict):
+        if "final_answer" in nat_payload["answer"]:
+            return nat_payload["answer"]
+
+    # Case 3: NAT returns output/result/response/content/value
+    if isinstance(nat_payload, dict):
+        for key in ["output", "result", "response", "content", "value"]:
+            value = nat_payload.get(key)
+            if value:
+                # Some NAT responses wrap the real payload as a JSON string in "value".
+                if key == "value" and isinstance(value, str):
+                    try:
+                        nested = json.loads(value)
+                        nested_answer = normalize_nat_answer(nested)
+                        if nested_answer:
+                            return nested_answer
+                    except Exception:
+                        pass
+                parsed = try_parse_final_answer(value)
+                if parsed:
+                    return parsed
+
+    # Case 4: NAT returns raw string
+    if isinstance(nat_payload, str):
+        parsed = try_parse_final_answer(nat_payload)
+        if parsed:
+            return parsed
+
+        return {
+            "final_answer": [
+                {
+                    "type": "llm",
+                    "text": nat_payload
+                }
+            ]
+        }
+
+    # Final fallback
+    return {
+        "final_answer": [
+            {
+                "type": "llm",
+                "text": str(nat_payload)
+            }
+        ]
+    }
+
+
+def sanitize_final_answer(answer_obj):
+    """
+    Clean final_answer text for UI readability:
+    - strip markdown emphasis markers
+    - remove wrapping quotes
+    - suppress redundant SQL meta lines like "The SQL query confirms..."
+    """
+    if not isinstance(answer_obj, dict):
+        return answer_obj
+    items = answer_obj.get("final_answer")
+    if not isinstance(items, list):
+        return answer_obj
+
+    cleaned = []
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        item_type = str(item.get("type") or "llm").strip()
+        text = str(item.get("text") or "").strip()
+        if not text:
+            continue
+
+        # Remove markdown emphasis and wrapping quote artifacts.
+        text = text.replace("**", "")
+        if len(text) >= 2 and text[0] == text[-1] and text[0] in ("'", '"'):
+            text = text[1:-1].strip()
+        text = re.sub(r"\s+", " ", text).strip()
+
+        # Drop non-insight SQL meta confirmations if there is another insight line.
+        if item_type.lower() == "sql" and re.search(
+            r"\b(sql query|query confirms|sql result)\b", text, re.IGNORECASE
+        ):
+            continue
+
+        cleaned.append({"type": item_type, "text": text})
+
+    if cleaned:
+        return {"final_answer": cleaned}
+    return answer_obj
+
+
+def extract_answer_text_and_plot(nat_payload):
+    """
+    Return a clean final answer string and optional plot_base64.
+    Supports NAT payloads wrapped in {"value": "<json>"}.
+    """
+    payload = nat_payload
+    if isinstance(payload, dict) and isinstance(payload.get("value"), str):
+        try:
+            payload = json.loads(payload["value"])
+        except Exception:
+            pass
+
+    plot_base64 = None
+    token_usage = 0
+
+    if isinstance(payload, dict):
+        token_usage = int(payload.get("token_usage") or 0)
+        plot_base64 = payload.get("plot_base64")
+
+    normalized = sanitize_final_answer(normalize_nat_answer(payload))
+    parts = []
+    if isinstance(normalized, dict):
+        for item in normalized.get("final_answer", []):
+            if isinstance(item, dict):
+                text = str(item.get("text") or "").strip()
+                if text:
+                    parts.append(text)
+
+    
+    # still show both SQL and insight text.
+    final_text = " ".join(parts).strip()
+    if not final_text:
+        final_text = str(payload if payload is not None else "").strip()
+
+    return normalized, final_text, plot_base64, token_usage
+
+
+async def call_nat_workflow(query):
+    """
+    Calls the NeMo Agent Toolkit workflow service and normalizes the output
+    into the existing frontend response contract.
+    """
+    nat_start = time.time()
+    try:
+        # NAT workflows can include multi-agent loops; keep timeout generous.
+        async with httpx.AsyncClient(timeout=360) as client:
+            response = await client.post(
+                NAT_WORKFLOW_URL,
+                json={"user_input": query}
+            )
+            response.raise_for_status()
+    finally:
+        print(f"[latency][service] nat_workflow_call_sec={time.time() - nat_start:.3f}")
+
+    try:
+        nat_payload = response.json()
+    except Exception:
+        nat_payload = response.text
+
+    formatted_answer, final_answer_text, plot_base64, token_usage = extract_answer_text_and_plot(nat_payload)
+
+    response_payload = {
+        "data_points": {},
+        # Keep structured answer for Unified UI (expects answer.final_answer[]).
+        "answer": formatted_answer,
+        # Also provide plain text for callers that want a single string.
+        "answer_text": final_answer_text,
+        "thoughts": "",
+        "sql_query": "",
+        "token_usage": token_usage,
+        "credit_used": 0,
+        "feedback": "",
+        "nat_metadata": {
+            "service_layer": "nemo-agent-toolkit",
+            "workflow_url": NAT_WORKFLOW_URL,
+            "orchestration": "autogen-agentchat",
+            "model_provider": "nvidia-nim",
+            "latency_sec": round(time.time() - nat_start, 3),
+        }
+    }
+    if plot_base64:
+        response_payload["plot_base64"] = plot_base64
+    return response_payload
 @app.post("/generate_response")
 async def ask_api_call(request: Request):
     # start_time_complete_api_call =  datetime.datetime.now()
+    req_start = time.time()
     request_json = await request.json()
+    service_latencies = {}
     email = request_json.get("email")
     index_type = request_json.get("index_type")
     explain_code = request_json.get("explain_code")
     print('email',email)
     # token_usage = None
     # start_time_check_balance = datetime.datetime.now()
-    if check_balance(email):
+    balance_start = time.time()
+    has_balance = check_balance(email)
+    service_latencies["check_balance_sec"] = round(time.time() - balance_start, 3)
+    print(f"[latency][service] check_balance_sec={service_latencies['check_balance_sec']:.3f}")
+    if has_balance:
         try:
             start_time = time.time()
             start_time_query_result_1 =  datatimeupdate()
@@ -118,7 +391,10 @@ async def ask_api_call(request: Request):
             useai = request_json["useai"]
             include_category = request_json["overrides"]["include_category"]
             # start_time_get_inactive_categories =  datetime.datetime.now()
+            cat_start = time.time()
             cat_list = await get_all_categories()
+            service_latencies["get_all_categories_sec"] = round(time.time() - cat_start, 3)
+            print(f"[latency][service] get_all_categories_sec={service_latencies['get_all_categories_sec']:.3f}")
             # end_time_get_inactive_categories = datetime.datetime.now()
             # time_taken_get_inactive_categories = (end_time_get_inactive_categories - start_time_get_inactive_categories).total_seconds()
             include_category.extend(cat['id'] for cat in cat_list)
@@ -126,6 +402,7 @@ async def ask_api_call(request: Request):
             # start_time_total_open_call =  datetime.datetime.now()
       
             if useai == 0:
+                query_params = []
                 
                 if include_category:
                     include_category = sorted(include_category)
@@ -151,12 +428,15 @@ async def ask_api_call(request: Request):
                 askResponse = {}
 
                 
+                qa_lookup_start = time.time()
                 query_result = feedback_container.query_items(
                     query=sql,
                     parameters=query_params,
                     enable_cross_partition_query=True,
                     max_item_count=1
                 )
+                service_latencies["qa_exact_lookup_sec"] = round(time.time() - qa_lookup_start, 3)
+                print(f"[latency][service] qa_exact_lookup_sec={service_latencies['qa_exact_lookup_sec']:.3f}")
        
  
                 qa_record = None
@@ -169,7 +449,10 @@ async def ask_api_call(request: Request):
                 if not qa_record:
                     # Similar
                     match_found = None
+                    similar_start = time.time()
                     match_found = await get_similar_qa(query)
+                    service_latencies["qa_similarity_lookup_sec"] = round(time.time() - similar_start, 3)
+                    print(f"[latency][service] qa_similarity_lookup_sec={service_latencies['qa_similarity_lookup_sec']:.3f}")
                     print("matchfound",match_found)
                     # Determine which search_client to use based on index_type
 
@@ -181,13 +464,26 @@ async def ask_api_call(request: Request):
                             filter = f"({include_filter})"
                         # print('!!!!!!!!!!!!!!! include_category[0] !!!!!!!!!!!!!!!!!!!!!', include_category[0])
                         print("-----------------Agenting Call happened-------------")
-                        
-                        askResponse = await start_agenting_process(query, index_type, filter, explain_code,include_category[0], email)
-                        askResponse["dbresponse"] = 0
-                        token_usage = askResponse.get("token_usage")
 
-                        askResponse = await process_query_and_update(email,query, token_usage, askResponse, start_time, 
-                        include_category=None)
+                        print("-----------------NAT Workflow Call happened-------------")
+                        askResponse = await call_nat_workflow(query)
+                        service_latencies["nat_workflow_sec"] = askResponse.get("nat_metadata", {}).get("latency_sec", 0)
+                        print(f"[latency][service] nat_workflow_sec={service_latencies['nat_workflow_sec']:.3f}")
+
+                        askResponse["dbresponse"] = 0
+                        token_usage = askResponse.get("token_usage", 0)
+
+                        update_start = time.time()
+                        askResponse = await process_query_and_update(
+                            email,
+                            query,
+                            token_usage,
+                            askResponse,
+                            start_time,
+                            include_category=None
+                        )
+                        service_latencies["process_query_update_sec"] = round(time.time() - update_start, 3)
+                        print(f"[latency][service] process_query_update_sec={service_latencies['process_query_update_sec']:.3f}")
  
                     else:
                         askResponse['answer'] = match_found[0]['answer']
@@ -217,20 +513,44 @@ async def ask_api_call(request: Request):
                     include_filter = " or ".join(f"category eq '{category}'" for category in include_category)
                     filter = f"({include_filter})"
                 print("-----------------Agenting Call happened-------------")
-                askResponse = await start_agenting_process(query, index_type, filter, explain_code,include_category[0], email)
- 
-                # print('response', askResponse)
-                askResponse['dbresponse'] = 0
-           
-                token_usage = askResponse.get("token_usage")
-                askResponse = await process_query_and_update(email,query, token_usage, askResponse, start_time,
-                include_category=None)
 
+                print("-----------------NAT Workflow Call happened-------------")
+                askResponse = await call_nat_workflow(query)
+                service_latencies["nat_workflow_sec"] = askResponse.get("nat_metadata", {}).get("latency_sec", 0)
+                print(f"[latency][service] nat_workflow_sec={service_latencies['nat_workflow_sec']:.3f}")
+
+                askResponse['dbresponse'] = 0
+
+                token_usage = askResponse.get("token_usage", 0)
+                update_start = time.time()
+                askResponse = await process_query_and_update(
+                    email,
+                    query,
+                    token_usage,
+                    askResponse,
+                    start_time,
+                    include_category=None
+                )
+                service_latencies["process_query_update_sec"] = round(time.time() - update_start, 3)
+                print(f"[latency][service] process_query_update_sec={service_latencies['process_query_update_sec']:.3f}")
+
+            askResponse["service_latencies"] = service_latencies
+            askResponse["total_latency_sec"] = round(time.time() - req_start, 3)
+            print(f"[latency][total] generate_response_total_sec={askResponse['total_latency_sec']:.3f}")
             return JSONResponse(content=askResponse, status_code=200)
        
+        except httpx.ReadTimeout:
+            total = round(time.time() - req_start, 3)
+            print(f"[latency][total] generate_response_total_sec={total:.3f}")
+            return JSONResponse(
+                {"error": "NAT workflow timed out", "total_latency_sec": total, "service_latencies": service_latencies},
+                status_code=504,
+            )
         except Exception as e:
             print(str(e))
             logging.exception("Exception in /ask")
+            total = round(time.time() - req_start, 3)
+            print(f"[latency][total] generate_response_total_sec={total:.3f}")
             return JSONResponse({"error": str(e)}, status_code=500)
  
     else:
