@@ -24,7 +24,7 @@ functions:
     description: Retrieve semantic context from vector, graph, or hybrid source.
 
 workflow:
-  _type: unified_autogen_team
+  _type: unified_nat_team
   llm_name: unified_nim_llm
   tool_names:
     - execute_sql_query

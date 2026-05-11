@@ -8,7 +8,6 @@ from pathlib import Path
 from pydantic import Field
 
 from nat.builder.builder import Builder
-from nat.builder.framework_enum import LLMFrameworkEnum
 from nat.builder.function_info import FunctionInfo
 from nat.cli.register_workflow import register_function
 from nat.data_models.component_ref import LLMRef
@@ -17,15 +16,13 @@ from nat.data_models.function import FunctionBaseConfig
 logger = logging.getLogger(__name__)
 
 
-class UnifiedAutoGenTeamConfig(
+class UnifiedNatTeamConfig(
     FunctionBaseConfig,
-    name="unified_autogen_team"
+    name="unified_nat_team",
 ):
-    # Kept for compatibility with existing NAT YAML.
-    llm_name: LLMRef = Field(description="NVIDIA NIM LLM configured in NAT YAML")
+    llm_name: LLMRef = Field(description="NVIDIA NIM LLM (reserved for NAT YAML; orchestration uses NIM via inference env)")
     tool_names: list[str] = Field(default_factory=list)
 
-    # Defaults for orchestration inputs expected by utility.inference.start_agenting_process.
     default_index_type: str = "hybrid"
     default_filter: str = ""
     default_explain_code: bool = False
@@ -34,37 +31,25 @@ class UnifiedAutoGenTeamConfig(
 
 
 @register_function(
-    config_type=UnifiedAutoGenTeamConfig,
-    framework_wrappers=[LLMFrameworkEnum.AUTOGEN]
+    config_type=UnifiedNatTeamConfig,
+    framework_wrappers=None,
 )
-async def unified_autogen_team(
-    config: UnifiedAutoGenTeamConfig,
-    builder: Builder
+async def unified_nat_team(
+    config: UnifiedNatTeamConfig,
+    builder: Builder,
 ) -> AsyncIterator[FunctionInfo]:
-    # Ensure Backend root is importable so `utility.*` works in NAT runtime.
+    del builder  # Orchestration uses utility.unified_nat_orchestrator (OpenAI-compatible NIM client).
+
     backend_root = Path(__file__).resolve().parents[2]
     backend_root_str = str(backend_root)
     if backend_root_str not in sys.path:
         sys.path.insert(0, backend_root_str)
-
-    # Preserve NAT component resolution side effects/validation.
-    await builder.get_llm(
-        config.llm_name,
-        wrapper_type=LLMFrameworkEnum.AUTOGEN,
-    )
-    if config.tool_names:
-        await builder.get_tools(
-            config.tool_names,
-            wrapper_type=LLMFrameworkEnum.AUTOGEN,
-        )
 
     async def _workflow(user_input: str) -> str:
         try:
             try:
                 from utility.inference import start_agenting_process
             except ModuleNotFoundError:
-                # Fallback import by absolute file path for NAT runtimes
-                # that don't include Backend root on PYTHONPATH.
                 inference_path = backend_root / "utility" / "inference.py"
                 spec = importlib.util.spec_from_file_location(
                     "utility.inference", inference_path
@@ -118,10 +103,10 @@ async def unified_autogen_team(
             return json.dumps(result)
 
         except Exception as e:
-            logger.exception("Unified NAT AutoGen workflow failed")
+            logger.exception("Unified NAT workflow failed")
             return json.dumps({"error": f"Workflow error: {str(e)}"})
 
     yield FunctionInfo.from_fn(
         _workflow,
-        description="Run Unified AutoGen workflow through NeMo Agent Toolkit."
+        description="Run unified multi-agent workflow (NAT-native orchestration, same prompts and agent steps).",
     )

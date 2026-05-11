@@ -7,9 +7,12 @@ name = "unified-nat-autogen"
 version = "0.1.0"
 requires-python = ">=3.11,<3.14"
 dependencies = [
-  "nvidia-nat[autogen]",
-  "autogen-agentchat",
-  "autogen-ext",
+  "nvidia-nat",
+  "openai>=1.0.0",
+  # nvidia-nat-core pins NumPy 2.x; older pyarrow wheels fail with AttributeError: _ARRAY_API not found
+  "pyarrow>=17.0.0",
+  # SciPy <1.13 wheels target NumPy 1.x; mismatch causes ValueError: numpy.dtype size changed
+  "scipy>=1.13.0",
   "pandas",
   "sqlalchemy",
   "pyodbc",

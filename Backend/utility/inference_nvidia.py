@@ -2,9 +2,9 @@ import os
 
 from dotenv import load_dotenv
 
-# Pull in the entire existing Azure implementation (including Azure embeddings),
-# then override ONLY the Autogen chat/LLM configuration to use NVIDIA.
-from utility.inference import *  # noqa: F401,F403
+# Pull in the full inference stack (Azure Search + GraphRAG, etc.),
+# then provide a local NVIDIA NIM `llm_config` for any code that still reads it.
+from utility.inference import *  # noqa: F401,F4031
 
 load_dotenv("unified.env")
 

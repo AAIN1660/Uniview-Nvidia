@@ -4,6 +4,7 @@
 # ==========================================================
 
 # --- Secrets / environment files ---
+replacements.txt
 **/unified.env
 **/.env
 **/.env.*
