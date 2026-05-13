@@ -40,6 +40,7 @@ replacements.txt
 **/.nox/
 **/venv/
 **/.venv/
+**/.venv_nat/
 **/lvenv/
 **/*.egg-info/
 
@@ -62,5 +63,12 @@ replacements.txt
 # --- Docker ---
 **/.docker/
 
+# --- Generated data / artifacts ---
+**/graphragoutput/**/*.lance
+**/graphragoutput/**/*.manifest
+**/graphragoutput/**/*.txn
+**/.vite/
+
 # --- Misc ---
 **/.scannerwork/
+*.pdf

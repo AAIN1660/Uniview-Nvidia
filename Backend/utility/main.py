@@ -49,7 +49,6 @@ def _clean_env(value, default=None):
 # NAT-only mode: always route generation through NeMo Agent Toolkit workflow.
 USE_NAT_WORKFLOW = True
 NAT_WORKFLOW_URL = _clean_env(os.getenv("NAT_WORKFLOW_URL"), "http://127.0.0.1:8090/generate")
-NAT_WORKFLOW_TIMEOUT_SEC = float(_clean_env(os.getenv("NAT_WORKFLOW_TIMEOUT_SEC"), "720"))
 
 # Set logging level to ERROR or CRITICAL
 logging.getLogger('azure.core.pipeline.policies.http_logging_policy').setLevel(logging.ERROR)
@@ -321,7 +320,7 @@ async def call_nat_workflow(query):
     """
     nat_start = time.time()
     try:
-        async with httpx.AsyncClient(timeout=NAT_WORKFLOW_TIMEOUT_SEC) as client:
+        async with httpx.AsyncClient(timeout=360) as client:
             response = await client.post(
                 NAT_WORKFLOW_URL,
                 json={"user_input": query}
@@ -533,7 +532,7 @@ async def ask_api_call(request: Request):
                 # =====================================================
                 # OUTPUT GUARDRAILS
                 # =====================================================
-                output_check = check_output(askResponse.get("answer", ""))
+                output_check = check_output(askResponse.get("answer_text", ""))
                 if not output_check["allowed"]:
                     askResponse["answer"]           = output_check["text"]
                     askResponse["guardrail_blocked"] = True
@@ -564,15 +563,8 @@ async def ask_api_call(request: Request):
             total = round(time.time() - req_start, 3)
             print(f"[latency][total] generate_response_total_sec={total:.3f}")
             return JSONResponse(
-                {
-                    "answer": "The request is taking longer than expected. Please try again.",
-                    "answer_text": "The request is taking longer than expected. Please try again.",
-                    "error": "NAT workflow timed out",
-                    "guardrail_blocked": False,
-                    "total_latency_sec": total,
-                    "service_latencies": service_latencies,
-                },
-                status_code=200,
+                {"error": "NAT workflow timed out", "total_latency_sec": total, "service_latencies": service_latencies},
+                status_code=504,
             )
         except Exception as e:
             print(str(e))

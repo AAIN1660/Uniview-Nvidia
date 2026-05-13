@@ -409,19 +409,43 @@ def get_sql_table_schema(connection_string, table_names):
     return schema_dict
 
 
-# Function to handle the vector_rag logic
+def _vector_search_backend() -> str:
+    b = (os.getenv("VECTOR_SEARCH_BACKEND") or "azure").strip().lower()
+    return "zilliz" if b in ("zilliz", "milvus") else "azure"
+
+
 def handle_vector_upload(file_path, file_name, file_id, email):
+    """
+    Upload PDF to blob storage and ingest into the active vector backend.
+    Returns a list of chunk IDs created in the vector store (empty for Azure queue path).
+    """
     print("file_path:", file_path)
     blob_name = os.path.basename(file_path)
     blob_client = container_client.get_blob_client(blob_name)
     print("blob_name:", blob_name)
+
     with open(file_path, "rb") as data:
         blob_client.upload_blob(data, overwrite=True)
+
+    chunk_ids: list[str] = []
+
+    if _vector_search_backend() == "zilliz":
+        from utility.zilliz_ingestion import ingest_pdf_bytes_to_zilliz
+
+        with open(file_path, "rb") as f:
+            pdf_bytes = f.read()
+        result = ingest_pdf_bytes_to_zilliz(
+            pdf_bytes, source_name=file_name
+        )
+        chunk_ids = result.get("ids", [])
+        print(f"[Zilliz] Ingested {result.get('chunks', 0)} chunks for {file_name}")
+    else:
         msg = json.dumps(
             {"file_name": file_name, "file_id": str(file_id), "email": email}
         )
         QUEUE_CLIENT.send_message(msg)
-    # os.remove(file_path)
+
+    return chunk_ids
 
 
 def load_settings(file_path: str, category_id) -> dict:
