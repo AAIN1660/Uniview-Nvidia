@@ -72,3 +72,5 @@ replacements.txt
 # --- Misc ---
 **/.scannerwork/
 *.pdf
+
+copy/
