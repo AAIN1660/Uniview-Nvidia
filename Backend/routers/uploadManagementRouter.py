@@ -148,8 +148,9 @@ async def create_upload_file(
                     # Check upload mode
                     if vector_rag.lower() == "true":
                         item['vector_rag'] = vector_rag
-                        handle_vector_upload(file_path, file_name, file_id, email)
-                        # os.remove(file_path)
+                        chunk_ids = handle_vector_upload(file_path, file_name, file_id, email)
+                        if chunk_ids:
+                            item['chunk_ids'] = chunk_ids
                         print(f"Uploading in vector_rag mode: {file_name}")
 
                     if graph_rag.lower() == "true":
@@ -270,12 +271,18 @@ async def delete_chunks_by_title(request: Request):
         raw_data = await request.json()
         print("*****************raw_data********************", raw_data)
  
-        # ------STEP 1: DELETE INDEXES FROM ACS (Azure Cognitive Search)------
-        ids = [id for id in raw_data.get("chunk_ids", []) if id.strip()]  # Filter out empty strings
+        # ------STEP 1: DELETE INDEXES FROM VECTOR STORE------
+        ids = [id for id in raw_data.get("chunk_ids", []) if str(id).strip()]
         if ids:
-            docid = [{'id': i} for i in ids]
-            search_client.delete_documents(documents=docid)
-            print("Step 1 finished")
+            backend = (os.getenv("VECTOR_SEARCH_BACKEND") or "azure").strip().lower()
+            if backend in ("zilliz", "milvus"):
+                from utility.zilliz_client import delete_chunks_by_ids as zilliz_delete
+                zilliz_delete(ids)
+                print(f"Step 1 finished (Zilliz): deleted {len(ids)} chunks")
+            else:
+                docid = [{'id': i} for i in ids]
+                search_client.delete_documents(documents=docid)
+                print("Step 1 finished (Azure Search)")
  
         # ------STEP 2: DELETE FILE FROM BLOB STORAGE------
         blob_name = raw_data.get("blob_name")

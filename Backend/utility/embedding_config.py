@@ -17,20 +17,28 @@ load_dotenv("unified.env")
 InputType = Literal["query", "passage"]
 
 
+def _clean_env(value: str | None, default: str = "") -> str:
+    value = value if value is not None else default
+    value = str(value).strip()
+    if len(value) >= 2 and value[0] == value[-1] and value[0] in ("'", '"'):
+        value = value[1:-1].strip()
+    return value
+
+
 def embedding_backend() -> str:
-    return (os.getenv("EMBEDDING_BACKEND") or "azure").strip().lower()
+    return _clean_env(os.getenv("EMBEDDING_BACKEND"), "azure").lower()
 
 
 def embedding_model_id() -> str:
     if embedding_backend() == "nvidia":
-        return (os.getenv("NVIDIA_EMBEDDING_MODEL") or "nvidia/nv-embedqa-e5-v5").strip()
-    return (os.getenv("AZURE_OPENAI_EMBEDDING_DEPLOYED_MODEL") or "").strip()
+        return _clean_env(os.getenv("NVIDIA_EMBEDDING_MODEL"), "nvidia/nv-embedqa-e5-v5")
+    return _clean_env(os.getenv("AZURE_OPENAI_EMBEDDING_DEPLOYED_MODEL"))
 
 
 def get_embedding_client() -> AzureOpenAI | OpenAI:
     if embedding_backend() == "nvidia":
-        base = (os.getenv("NVIDIA_EMBEDDING_BASE_URL") or "https://integrate.api.nvidia.com/v1").strip()
-        key = (os.getenv("NVIDIA_EMBEDDING_API_KEY") or os.getenv("NVIDIA_API_KEY") or "").strip()
+        base = _clean_env(os.getenv("NVIDIA_EMBEDDING_BASE_URL"), "https://integrate.api.nvidia.com/v1")
+        key = _clean_env(os.getenv("NVIDIA_EMBEDDING_API_KEY") or os.getenv("NVIDIA_API_KEY"))
         if not key:
             raise ValueError(
                 "EMBEDDING_BACKEND=nvidia requires NVIDIA_EMBEDDING_API_KEY (or NVIDIA_API_KEY) in unified.env"
@@ -64,5 +72,23 @@ def create_embedding_vector(
     model = embedding_model_id()
     kwargs = embedding_create_kwargs(input_type=input_type)
     inp = text if isinstance(text, str) else str(text)
-    response = client.embeddings.create(input=inp, model=model, **kwargs)
-    return response.data[0].embedding
+    try:
+        response = client.embeddings.create(input=inp, model=model, **kwargs)
+        return response.data[0].embedding
+    except Exception as exc:
+        # Fallback for environments where NVIDIA /embeddings may be unavailable
+        # for a given account/model. This keeps retrieval working instead of
+        # failing the whole workflow.
+        message = str(exc).lower()
+        if embedding_backend() == "nvidia" and "404" in message:
+            azure_client = AzureOpenAI(
+                api_key=_clean_env(os.getenv("AZURE_OPENAI_API_KEY")),
+                api_version=_clean_env(os.getenv("AZURE_OPENAI_API_VERSION")),
+                azure_endpoint=_clean_env(os.getenv("AZURE_OPENAI_API_BASE")),
+            )
+            azure_model = _clean_env(os.getenv("AZURE_OPENAI_EMBEDDING_DEPLOYED_MODEL"))
+            if not azure_model:
+                raise
+            response = azure_client.embeddings.create(input=inp, model=azure_model)
+            return response.data[0].embedding
+        raise

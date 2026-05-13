@@ -133,9 +133,33 @@ connection_string = f'mssql+pyodbc:///?odbc_connect={urllib.parse.quote_plus(f"D
 
 # Use the shared pooled engine so all SQL paths (schema reflection, schema
 # cache, ``execute_sql_tool``) share one connection pool per connection
-# string.
+# string. ``_ensure_engine`` adds an active health-check + rebuild so a
+# stale connection mid-session can't break a long NAT run.
+def _build_engine():
+    return get_sql_engine(connection_string)
+
+
+def _ensure_engine():
+    global engine
+    if engine is None:
+        engine = _build_engine()
+        return engine
+    try:
+        with engine.connect() as conn:
+            conn.exec_driver_sql("SELECT 1")
+        return engine
+    except Exception:
+        try:
+            engine.dispose()
+        except Exception:
+            pass
+        engine = _build_engine()
+        return engine
+
+
+# Create the SQLAlchemy engine
 try:
-    engine = get_sql_engine(connection_string)
+    engine = _build_engine()
 except Exception as _engine_exc:
     print("SQL engine initialization failed at startup:", _engine_exc)
     engine = None
@@ -237,6 +261,14 @@ def generate_embeddings(text, client, embedding_model_deloyment_name):
     return embeddings
 
 
+def _vector_search_backend() -> str:
+    """Hybrid/vector RAG retrieval: 'azure' (Azure AI Search) or 'zilliz' (Milvus/Zilliz via utility.zilliz_client)."""
+    b = (os.getenv("VECTOR_SEARCH_BACKEND") or "azure").strip().lower()
+    if b in ("zilliz", "milvus"):
+        return "zilliz"
+    return "azure"
+
+
 search_client = SearchClient(endpoint=AZURE_SEARCH_SERVICE_ENDPOINT,index_name=AZURE_SEARCH_INDEX_NAME,
                              credential=azure_search_credential
                              )
@@ -253,11 +285,25 @@ llm = ChatOpenAI(
 
 token_encoder = tiktoken.get_encoding("cl100k_base")
 
+class _NvidiaOpenAIEmbedding(OpenAIEmbedding):
+    """Thin wrapper that injects input_type required by NVIDIA asymmetric models."""
+
+    def _embed_with_retry(self, text, **kwargs):
+        kwargs.setdefault("extra_body", {})
+        kwargs["extra_body"].setdefault("input_type", "query")
+        return super()._embed_with_retry(text, **kwargs)
+
+    async def _aembed_with_retry(self, text, **kwargs):
+        kwargs.setdefault("extra_body", {})
+        kwargs["extra_body"].setdefault("input_type", "query")
+        return await super()._aembed_with_retry(text, **kwargs)
+
+
 if embedding_backend() == "nvidia":
     _nv_key = os.getenv("NVIDIA_EMBEDDING_API_KEY") or os.getenv("NVIDIA_API_KEY")
     _nv_base = os.getenv("NVIDIA_EMBEDDING_BASE_URL", "https://integrate.api.nvidia.com/v1")
     _nv_model = os.getenv("NVIDIA_EMBEDDING_MODEL", "nvidia/nv-embedqa-e5-v5")
-    text_embedder = OpenAIEmbedding(
+    text_embedder = _NvidiaOpenAIEmbedding(
         api_key=_nv_key,
         api_base=_nv_base,
         api_version="2024-02-01",
@@ -447,7 +493,25 @@ async def extract_context(question: str = None, vector_weight: float = 0.5, grap
             else os.getenv("AZURE_OPENAI_EMBEDDING_DEPLOYED_MODEL")
         )
         #print("searchinggg", model)
-        vector_query = VectorizedQuery(vector=generate_embeddings(question, client, model), k_nearest_neighbors=3, fields="contentVector")
+        vector = generate_embeddings(question, client, model)
+        if _vector_search_backend() == "zilliz":
+            from utility import zilliz_client as _zilliz_client
+
+            top_k_raw = os.getenv("ZILLIZ_VECTOR_TOP_K") or os.getenv("VECTOR_TOP_K") or "3"
+            try:
+                top_k = max(1, int(str(top_k_raw).strip()))
+            except ValueError:
+                top_k = 3
+            hits = _zilliz_client.search_chunks(vector, top_k=top_k, category_ids=None)
+            result_list = {"chunks": [], "sources": []}
+            for h in hits:
+                sp = h.get("sourcepage") or h.get("source_file") or h.get("title") or ""
+                ct = h.get("content") or h.get("text") or ""
+                result_list["sources"].append(sp)
+                result_list["chunks"].append(f"{sp}: {ct}")
+            return result_list
+
+        vector_query = VectorizedQuery(vector=vector, k_nearest_neighbors=3, fields="contentVector")
         results = search_client.search(
             search_text=question,
             vector_queries=[vector_query],
@@ -788,14 +852,15 @@ async def start_agenting_process(query, index_type, filter, explain_code, catego
     print('&&&&&&&&&&&&&&&&&&&&&&&&&&&&&& all_table_schemas &&&&&&&&&&&&&&&&&&&&&&&&&&&&&&', user_seleted_tables)
 
     selected_tables = []
+    current_engine = _ensure_engine()
     if isinstance(user_seleted_tables, dict):
         selected_tables = user_seleted_tables.get('tables_list') or []
 
     if not selected_tables:
-        if engine is not None:
-            selected_tables = inspect(engine).get_table_names(schema=category_name)
+        if current_engine is not None:
+            selected_tables = inspect(current_engine).get_table_names(schema=category_name)
             if not selected_tables:
-                selected_tables = inspect(engine).get_table_names()
+                selected_tables = inspect(current_engine).get_table_names()
 
     all_table_schemas = get_sql_table_schema(connection_string, selected_tables)
 
@@ -804,14 +869,14 @@ async def start_agenting_process(query, index_type, filter, explain_code, catego
         or (isinstance(all_table_schemas, dict) and len(all_table_schemas) == 0)
         or (isinstance(all_table_schemas, str) and all_table_schemas.lower().startswith('error'))
     ):
-        if engine is not None:
-            all_table_schemas = get_schema_tables(engine, category_name)
+        if current_engine is not None:
+            all_table_schemas = get_schema_tables(current_engine, category_name)
 
     if not all_table_schemas:
         try:
-            if engine is None:
+            if current_engine is None:
                 raise RuntimeError('SQL engine unavailable')
-            inspector = inspect(engine)
+            inspector = inspect(current_engine)
             all_schema_dict = {}
             for schema_name in inspector.get_schema_names():
                 if not schema_name or schema_name.startswith('db_'):
