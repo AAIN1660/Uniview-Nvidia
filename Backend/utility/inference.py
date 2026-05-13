@@ -3,6 +3,7 @@ import time
 import pandas as pd
 import tiktoken
 import asyncio
+import threading
 ## SQL 
 import pandas as pd
 from sqlalchemy import create_engine, inspect, MetaData, Table, Column, String, Integer
@@ -46,7 +47,12 @@ import ast
 import matplotlib.pyplot as plt
 import seaborn as sns
 import base64
-from utility.helper import get_sql_table_schema, get_tables_list_by_email, formating_final_answer
+from utility.helper import (
+    formating_final_answer,
+    get_sql_engine,
+    get_sql_table_schema,
+    get_tables_list_by_email,
+)
 # from helper import get_sql_table_schema, get_tables_list_by_email, formating_final_answer
 from dotenv import load_dotenv
 import tempfile
@@ -125,9 +131,11 @@ table_name = ["marsdata","unified_HR_data","healthcare_patient_details","healthc
 
 connection_string = f'mssql+pyodbc:///?odbc_connect={urllib.parse.quote_plus(f"DRIVER={driver};SERVER={host};DATABASE={database};UID={username};PWD={password}")}'
 
-# Create the SQLAlchemy engine
+# Use the shared pooled engine so all SQL paths (schema reflection, schema
+# cache, ``execute_sql_tool``) share one connection pool per connection
+# string.
 try:
-    engine = create_engine(connection_string)
+    engine = get_sql_engine(connection_string)
 except Exception as _engine_exc:
     print("SQL engine initialization failed at startup:", _engine_exc)
     engine = None
@@ -315,6 +323,115 @@ def download_blob_to_tempfile(blob_service_client, container_name, blob_path):
     return temp_file.name
 
 
+def _download_blob_bytes(blob_service_client, container_name, blob_path) -> bytes:
+    """In-memory blob fetch used by the cached GraphRAG bootstrap.
+
+    Avoids tempfile writes that ``download_blob_to_tempfile`` performs on every
+    semantic round. Bytes are passed straight into pandas via ``io.BytesIO``.
+    """
+    blob_client = blob_service_client.get_blob_client(container=container_name, blob=blob_path)
+    return blob_client.download_blob().readall()
+
+
+# Cache for the GraphRAG ``LocalSearchMixedContext`` builder keyed by
+# (container, folder). The 5 parquet files + LanceDB connect + entity
+# embedding store are immutable for a given indexed artifact set, so we
+# build the context object once per process and reuse it on every
+# semantic round.
+_GRAPH_CONTEXT_CACHE: dict[tuple[str, str], dict[str, object]] = {}
+_GRAPH_CONTEXT_LOCK = threading.Lock()
+try:
+    _GRAPH_CONTEXT_TTL_SEC = float(os.getenv("GRAPH_RAG_CACHE_TTL_SEC", "0") or "0")
+except ValueError:
+    _GRAPH_CONTEXT_TTL_SEC = 0.0
+
+
+def _build_graph_context_builder(container_name: str, folder_path: str) -> LocalSearchMixedContext:
+    """Heavy one-time setup for a given indexed artifact set.
+
+    Downloads the 5 parquet files in-memory, processes entities /
+    relationships / reports / text units, connects to LanceDB once,
+    stores entity semantic embeddings, and returns the constructed
+    ``LocalSearchMixedContext``.
+    """
+    COMMUNITY_REPORT_TABLE = "create_final_community_reports"
+    ENTITY_TABLE = "create_final_nodes"
+    ENTITY_EMBEDDING_TABLE = "create_final_entities"
+    RELATIONSHIP_TABLE = "create_final_relationships"
+    TEXT_UNIT_TABLE = "create_final_text_units"
+    COMMUNITY_LEVEL = 3
+
+    LANCEDB_URI = os.path.join(os.getcwd(), 'graphragoutput')
+
+    def _read(table: str) -> pd.DataFrame:
+        data = _download_blob_bytes(
+            blob_service_client, container_name, f"{folder_path}/{table}.parquet"
+        )
+        return pd.read_parquet(io.BytesIO(data))
+
+    entity_df = _read(ENTITY_TABLE)
+    entity_embedding_df = _read(ENTITY_EMBEDDING_TABLE)
+    relationship_df = _read(RELATIONSHIP_TABLE)
+    report_df = _read(COMMUNITY_REPORT_TABLE)
+    text_unit_df = _read(TEXT_UNIT_TABLE)
+
+    relationships = read_indexer_relationships(relationship_df)
+    entities = read_indexer_entities(entity_df, entity_embedding_df, COMMUNITY_LEVEL)
+
+    description_embedding_store = LanceDBVectorStore(collection_name="entity_description_embeddings")
+    description_embedding_store.connect(db_uri=LANCEDB_URI)
+    store_entity_semantic_embeddings(entities=entities, vectorstore=description_embedding_store)
+
+    reports = read_indexer_reports(report_df, entity_df, COMMUNITY_LEVEL)
+    text_units = read_indexer_text_units(text_unit_df)
+
+    return LocalSearchMixedContext(
+        community_reports=reports,
+        text_units=text_units,
+        entities=entities,
+        relationships=relationships,
+        covariates=None,
+        entity_text_embeddings=description_embedding_store,
+        embedding_vectorstore_key=EntityVectorStoreKey.ID,
+        text_embedder=text_embedder,
+        token_encoder=token_encoder,
+    )
+
+
+def _get_graph_context_builder(container_name: str, folder_path: str) -> LocalSearchMixedContext:
+    """Return a cached ``LocalSearchMixedContext`` or build + cache it.
+
+    Thread-safe via ``threading.Lock`` (build is invoked from worker
+    threads via ``asyncio.to_thread`` in the caller).
+    """
+    key = (container_name, folder_path)
+    now = time.time()
+    with _GRAPH_CONTEXT_LOCK:
+        entry = _GRAPH_CONTEXT_CACHE.get(key)
+        if entry is not None:
+            if _GRAPH_CONTEXT_TTL_SEC <= 0 or (now - float(entry["ts"])) < _GRAPH_CONTEXT_TTL_SEC:
+                return entry["builder"]  # type: ignore[return-value]
+
+    builder = _build_graph_context_builder(container_name, folder_path)
+
+    with _GRAPH_CONTEXT_LOCK:
+        _GRAPH_CONTEXT_CACHE[key] = {"builder": builder, "ts": time.time()}
+    return builder
+
+
+def invalidate_graph_context_cache(container_name: str | None = None, folder_path: str | None = None) -> None:
+    """Drop cached builders; use after a fresh GraphRAG index is published.
+
+    No-arg call clears everything. Pass both args to drop a single entry.
+    """
+    with _GRAPH_CONTEXT_LOCK:
+        if container_name is None and folder_path is None:
+            _GRAPH_CONTEXT_CACHE.clear()
+            return
+        if container_name is not None and folder_path is not None:
+            _GRAPH_CONTEXT_CACHE.pop((container_name, folder_path), None)
+
+
 async def extract_context(question: str = None, vector_weight: float = 0.5, graph_weight: float = 0.5) -> dict:
     selector = search_type
     # selector = 'hybrid'
@@ -349,70 +466,28 @@ async def extract_context(question: str = None, vector_weight: float = 0.5, grap
         return result_list
     
     async def fetch_graph_context():
-    
-    # INPUT_DIR = "./data/Procurement/artifacts"
+        # GraphRAG artifact path. Kept stable so the cache key
+        # ``(container, folder)`` stays warm across requests.
         print('########################## graphrag_category #############################', graphrag_category)
-        
-        # graphrag_category = '38421293-d0a3-4953-8a4d-f13f198aa91f'
-        BLOB_FOLDER_PATH = f"graphragoutput/b7a91d7b-f174-43c2-a5ef-e4af152768a7/artifacts"
+        BLOB_FOLDER_PATH = "graphragoutput/b7a91d7b-f174-43c2-a5ef-e4af152768a7/artifacts"
         print('*************** BLOB_FOLDER_PATH ***************', BLOB_FOLDER_PATH)
-        LANCEDB_URI = os.path.join(os.getcwd(), 'graphragoutput')
-        print('########################### LANCEDB_URI #####################', LANCEDB_URI)
-        COMMUNITY_REPORT_TABLE = "create_final_community_reports"
-        ENTITY_TABLE = "create_final_nodes"
-        ENTITY_EMBEDDING_TABLE = "create_final_entities"
-        RELATIONSHIP_TABLE = "create_final_relationships"
-        TEXT_UNIT_TABLE = "create_final_text_units"
-        COMMUNITY_LEVEL = 3
 
-        # Load data dynamically from Blob Storage
-        entity_parquet_path = f"{BLOB_FOLDER_PATH}/{ENTITY_TABLE}.parquet"
-        entity_file = download_blob_to_tempfile(blob_service_client, BLOB_CONTAINER_NAME, entity_parquet_path)
-        entity_df = pd.read_parquet(entity_file)
+        # First call: downloads 5 parquet files, connects LanceDB,
+        # stores entity embeddings, builds ``LocalSearchMixedContext``.
+        # Subsequent calls: instant cache hit, only ``build_context``
+        # below runs per question.
+        Localcontext_builder = await asyncio.to_thread(
+            _get_graph_context_builder, BLOB_CONTAINER_NAME, BLOB_FOLDER_PATH
+        )
 
-        entity_embedding_parquet_path = f"{BLOB_FOLDER_PATH}/{ENTITY_EMBEDDING_TABLE}.parquet"
-        entity_embedding_file = download_blob_to_tempfile(blob_service_client, BLOB_CONTAINER_NAME, entity_embedding_parquet_path)
-        entity_embedding_df = pd.read_parquet(entity_embedding_file)
-
-        relationship_parquet_path = f"{BLOB_FOLDER_PATH}/{RELATIONSHIP_TABLE}.parquet"
-        relationship_file = download_blob_to_tempfile(blob_service_client, BLOB_CONTAINER_NAME, relationship_parquet_path)
-        relationship_df = pd.read_parquet(relationship_file)
-
-        # Process relationships and entities
-        relationships = read_indexer_relationships(relationship_df)
-        entities = read_indexer_entities(entity_df, entity_embedding_df, COMMUNITY_LEVEL)
-        description_embedding_store = LanceDBVectorStore(collection_name="entity_description_embeddings")
-        description_embedding_store.connect(db_uri=LANCEDB_URI)
-        entity_description_embeddings = store_entity_semantic_embeddings(entities=entities, vectorstore=description_embedding_store)
-
-        # Load report data
-        report_parquet_path = f"{BLOB_FOLDER_PATH}/{COMMUNITY_REPORT_TABLE}.parquet"
-        report_file = download_blob_to_tempfile(blob_service_client, BLOB_CONTAINER_NAME, report_parquet_path)
-        report_df = pd.read_parquet(report_file)
-        reports = read_indexer_reports(report_df, entity_df, COMMUNITY_LEVEL)
-        
-        # Load text units
-        text_unit_parquet_path = f"{BLOB_FOLDER_PATH}/{TEXT_UNIT_TABLE}.parquet"
-        text_unit_file = download_blob_to_tempfile(blob_service_client, BLOB_CONTAINER_NAME, text_unit_parquet_path)
-        text_unit_df = pd.read_parquet(text_unit_file)
-        text_units = read_indexer_text_units(text_unit_df)
-        
-        Localcontext_builder = LocalSearchMixedContext(
-                community_reports=reports,
-                text_units=text_units,
-                entities=entities,
-                relationships=relationships,
-                # if you did not run covariates during indexing, set this to None
-                covariates=None,
-                entity_text_embeddings=description_embedding_store,
-                embedding_vectorstore_key=EntityVectorStoreKey.ID,  # if the vectorstore uses entity title as ids, set this to EntityVectorStoreKey.TITLE
-                text_embedder=text_embedder,
-                token_encoder=token_encoder,
-            )
-
-
-        context = Localcontext_builder.build_context(question, top_k_mapped_entities=2, top_k_relationships=2,max_tokens=12_000)
-        print("graph_context :::::",context)
+        context = await asyncio.to_thread(
+            Localcontext_builder.build_context,
+            question,
+            top_k_mapped_entities=2,
+            top_k_relationships=2,
+            max_tokens=12_000,
+        )
+        print("graph_context :::::", context)
         return context
     
     # Fetch contexts based on selector

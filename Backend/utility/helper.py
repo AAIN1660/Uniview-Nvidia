@@ -3,6 +3,7 @@ import logging
 import os
 from datetime import datetime
 import time
+import threading
 import uuid
 from azure.cosmos import CosmosClient, exceptions
 from azure.cosmos.errors import CosmosHttpResponseError
@@ -14,6 +15,7 @@ from difflib import SequenceMatcher
 import re
 import bcrypt
 from sqlalchemy import create_engine, inspect
+from sqlalchemy.engine import Engine
 import urllib
 import yaml
 import subprocess
@@ -384,19 +386,119 @@ def get_config_container():
 
 
 # Step 2: Fetch tables from the specified schema dynamically
+# ---------------------------------------------------------------------------
+# Pooled SQLAlchemy engine cache
+# ---------------------------------------------------------------------------
+# One engine (with its own connection pool) per connection string, shared
+# process-wide. Avoids the per-call ``create_engine(...)`` cost in
+# ``execute_sql_tool`` (invoked up to 8x per request inside the SQL critic
+# loop) and the duplicate engine spun up by ``get_sql_table_schema`` on every
+# request.
+
+_sql_engine_cache: dict[str, Engine] = {}
+_sql_engine_lock = threading.Lock()
+
+
+def _int_env(name: str, default: int) -> int:
+    try:
+        return int(os.getenv(name, str(default)) or default)
+    except ValueError:
+        return default
+
+
+def _bool_env(name: str, default: bool) -> bool:
+    raw = (os.getenv(name) or "").strip().lower()
+    if raw in ("1", "true", "yes", "on"):
+        return True
+    if raw in ("0", "false", "no", "off"):
+        return False
+    return default
+
+
+def get_sql_engine(connection_string: str) -> Engine:
+    """Return a shared, pooled SQLAlchemy engine for ``connection_string``.
+
+    Pool tunables via env:
+      - ``SQL_POOL_SIZE`` (default 5)
+      - ``SQL_MAX_OVERFLOW`` (default 10)
+      - ``SQL_POOL_RECYCLE`` (default 1800 seconds)
+      - ``SQL_POOL_PRE_PING`` (default True)
+    """
+    with _sql_engine_lock:
+        eng = _sql_engine_cache.get(connection_string)
+        if eng is not None:
+            return eng
+        eng = create_engine(
+            connection_string,
+            pool_size=_int_env("SQL_POOL_SIZE", 5),
+            max_overflow=_int_env("SQL_MAX_OVERFLOW", 10),
+            pool_recycle=_int_env("SQL_POOL_RECYCLE", 1800),
+            pool_pre_ping=_bool_env("SQL_POOL_PRE_PING", True),
+            future=True,
+        )
+        _sql_engine_cache[connection_string] = eng
+        return eng
+
+
+# ---------------------------------------------------------------------------
+# Schema cache for ``get_sql_table_schema``
+# ---------------------------------------------------------------------------
+# Inspecting the DB on every ``start_agenting_process`` call is expensive
+# (round trip + metadata reflection). Cache results by
+# ``(connection_string, frozenset(table_names))`` with a TTL.
+
+_sql_schema_cache: dict[tuple[str, frozenset], dict[str, object]] = {}
+_sql_schema_lock = threading.Lock()
+_SQL_SCHEMA_TTL_SEC = float(_int_env("SQL_SCHEMA_CACHE_TTL_SEC", 300))
+
+
+def invalidate_sql_schema_cache(connection_string: str | None = None) -> None:
+    """Drop cached SQL schemas.
+
+    No-arg call clears the entire cache; pass a ``connection_string`` to
+    drop only entries for that database. Call from your DB-connection
+    update / table-selection update endpoints when the schema or
+    selected tables actually change.
+    """
+    with _sql_schema_lock:
+        if connection_string is None:
+            _sql_schema_cache.clear()
+            return
+        for key in [k for k in _sql_schema_cache if k[0] == connection_string]:
+            _sql_schema_cache.pop(key, None)
+
+
 def get_sql_table_schema(connection_string, table_names):
-    engine = create_engine(connection_string)
     """
     Fetches the schema of multiple tables from the SQL Server database.
-    :param engine: SQLAlchemy engine object
-    :param table_names: List of table names whose schemas are required
-    :return: Dictionary with table names as keys and their schema details as values
+
+    Uses a shared pooled engine and an in-process cache keyed by
+    ``(connection_string, frozenset(table_names))`` with a TTL controlled
+    by env ``SQL_SCHEMA_CACHE_TTL_SEC`` (default 300s).
+
+    :param connection_string: SQLAlchemy-style connection string
+    :param table_names: Iterable of table names whose schemas are required
+    :return: Dict with table names as keys and their schema details as values
     """
-    schema_dict = {}
+    try:
+        key = (connection_string, frozenset(table_names or []))
+    except TypeError:
+        key = None
+
+    if key is not None:
+        now = time.time()
+        with _sql_schema_lock:
+            entry = _sql_schema_cache.get(key)
+            if entry is not None:
+                if _SQL_SCHEMA_TTL_SEC <= 0 or (now - float(entry["ts"])) < _SQL_SCHEMA_TTL_SEC:
+                    return entry["value"]
+
+    engine = get_sql_engine(connection_string)
+    schema_dict: dict[str, object] = {}
     try:
         inspector = inspect(engine)
         available_tables = inspector.get_table_names()
-        
+
         for table_name in table_names:
             if table_name in available_tables:
                 columns = inspector.get_columns(table_name)
@@ -405,7 +507,11 @@ def get_sql_table_schema(connection_string, table_names):
                 schema_dict[table_name] = f"Table '{table_name}' does not exist."
     except Exception as e:
         return f"Error fetching schema: {e}"
-    
+
+    if key is not None:
+        with _sql_schema_lock:
+            _sql_schema_cache[key] = {"value": schema_dict, "ts": time.time()}
+
     return schema_dict
 
 

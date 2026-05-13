@@ -1,47 +1,54 @@
 """
 OpenAI-compatible chat completions for NVIDIA NIM (NeMo Agent Toolkit stack).
 Used by the NAT-native orchestrator - no AutoGen dependency.
+
+The SDK class is named ``AsyncOpenAI`` but the client is pointed at the NVIDIA
+NIM endpoint via ``NVIDIA_BASE_URL`` and authenticated with ``NVIDIA_API_KEY``.
+All traffic stays on NIM; no call ever goes to api.openai.com.
 """
 
 from __future__ import annotations
 
+import asyncio
 import os
-import threading
 import time
 from typing import Any
 
-from openai import OpenAI
+from openai import AsyncOpenAI
 
 from utility.nemo_autogen_service import _clean_env, _normalize_base_url
 
-_client_lock = threading.Lock()
-_openai_client: OpenAI | None = None
-_openai_client_key: tuple[str, str] | None = None
+_client_lock = asyncio.Lock()
+_async_client: AsyncOpenAI | None = None
+_async_client_key: tuple[str, str] | None = None
 
 
-def _client() -> OpenAI:
+async def _client() -> AsyncOpenAI:
     """
-    Single shared OpenAI SDK client for all NIM calls.
+    Single shared async NIM client for all completions.
 
-    Reuses HTTP connections (TLS + pooling) across dozens of sequential completions,
-    without changing prompts, agents, or orchestration logic.
+    Reuses HTTP connections (TLS + pooling) across dozens of sequential
+    completions without changing prompts, agents, or orchestration logic.
+    The underlying transport is httpx.AsyncClient, which keeps connections
+    warm to the NIM endpoint and frees the FastAPI event loop while waiting
+    on the model.
     """
-    global _openai_client, _openai_client_key
+    global _async_client, _async_client_key
     base_url = _normalize_base_url(os.getenv("NVIDIA_BASE_URL"))
     api_key = _clean_env(os.getenv("NVIDIA_API_KEY"), "") or ""
     key = (base_url, api_key)
-    with _client_lock:
-        if _openai_client is None or _openai_client_key != key:
-            _openai_client = OpenAI(base_url=base_url, api_key=api_key)
-            _openai_client_key = key
-        return _openai_client
+    async with _client_lock:
+        if _async_client is None or _async_client_key != key:
+            _async_client = AsyncOpenAI(base_url=base_url, api_key=api_key)
+            _async_client_key = key
+        return _async_client
 
 
 def _model() -> str:
     return _clean_env(os.getenv("NVIDIA_MODEL"), "meta/llama-3.3-70b-instruct") or ""
 
 
-def chat_completion(
+async def chat_completion(
     agent_name: str,
     system: str,
     user: str,
@@ -51,8 +58,8 @@ def chat_completion(
 ) -> tuple[str, int]:
     """Returns (assistant_content, total_tokens). Updates agent_latency cumulative seconds."""
     t0 = time.time()
-    client = _client()
-    r = client.chat.completions.create(
+    client = await _client()
+    r = await client.chat.completions.create(
         model=_model(),
         messages=[
             {"role": "system", "content": system},
@@ -69,7 +76,7 @@ def chat_completion(
     return text, tokens
 
 
-def chat_completion_raw_messages(
+async def chat_completion_raw_messages(
     agent_name: str,
     messages: list[dict[str, Any]],
     agent_latency: dict[str, float],
@@ -78,8 +85,8 @@ def chat_completion_raw_messages(
 ) -> tuple[str, int]:
     """Multi-turn chat for agents that need prior steps in-context."""
     t0 = time.time()
-    client = _client()
-    r = client.chat.completions.create(
+    client = await _client()
+    r = await client.chat.completions.create(
         model=_model(),
         messages=messages,
         temperature=temperature,

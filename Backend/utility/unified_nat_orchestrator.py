@@ -5,13 +5,12 @@ Mirrors the former AutoGen GroupChat + state_transition flow in utility/inferenc
 
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 import shutil
 import time
 from typing import Any
-
-from sqlalchemy import create_engine
 
 from utility.agent_prompts import (
     CRITIC_AGENT_PROMPT,
@@ -25,6 +24,7 @@ from utility.agent_prompts import (
     sql_execution_critic_prompt,
     sql_generator_prompt,
 )
+from utility.helper import get_sql_engine
 from utility.nim_chat_client import chat_completion, chat_completion_raw_messages
 
 
@@ -41,13 +41,18 @@ def _log_message(
 
 
 def execute_sql_tool(query: str | None, connection_string: str) -> str:
-    """Same behavior as legacy Sql_tool execute_query."""
+    """Same behavior as legacy Sql_tool execute_query.
+
+    Uses the shared pooled engine from ``utility.helper.get_sql_engine`` so
+    the connection pool is reused across the up-to-8 SQL critic rounds and
+    across requests, instead of spinning up a new engine per call.
+    """
     import pandas as pd
 
     if not query:
         return "An error occurred while execusting the query: empty query"
     try:
-        engine = create_engine(connection_string)
+        engine = get_sql_engine(connection_string)
         df = pd.read_sql(query, engine)
         return df.to_json(orient="records")
     except Exception as e:
@@ -103,7 +108,7 @@ async def run_unified_nat_orchestration(
     # --- Routing (replaces user_proxy -> routing_agent) ---
     routing_sys = routing_agent_prompt(schema_text)
     routing_user = f""""question": {query}"""
-    routing_content, tok = chat_completion(
+    routing_content, tok = await chat_completion(
         "routing_agent", routing_sys, routing_user, agent_latency
     )
     total_tokens += tok
@@ -134,7 +139,7 @@ async def run_unified_nat_orchestration(
         "updated_question": query,
     }
 
-    def run_sql_chain(
+    async def run_sql_chain(
         initial_feedback: str | None = None,
     ) -> tuple[str, str, str, bool, str | None]:
         """Returns (insight_content, sql_query, sql_tool_output, semantic_early_exit, critic_snapshot)."""
@@ -156,7 +161,7 @@ async def run_unified_nat_orchestration(
                 gen_user_parts.append(f"Revision feedback from Sql_Execution_Critic / Sql_Generator loop:\n{feedback_hint}")
             gen_user = "\n\n".join(gen_user_parts)
 
-            sg_content, tok = chat_completion(
+            sg_content, tok = await chat_completion(
                 "Sql_Generator",
                 sql_generator_prompt(schema_text),
                 gen_user,
@@ -174,7 +179,7 @@ async def run_unified_nat_orchestration(
                 f"Sql_Generator output:\n{sg_content}\n\n"
                 f"Validate and confirm execution path for SQL against the user question:\n{query}"
             )
-            se_content, tok = chat_completion(
+            se_content, tok = await chat_completion(
                 "Sql_Executor", SQL_EXECUTOR_PROMPT, se_user, agent_latency
             )
             total_tokens += tok
@@ -185,7 +190,7 @@ async def run_unified_nat_orchestration(
                 f"Sql_Executor output:\n{se_content}\n\n"
                 f"Extract sql_query from Sql_Generator JSON if present; executable query:\n{q}"
             )
-            st_content, tok = chat_completion(
+            st_content, tok = await chat_completion(
                 "Sql_tool", SQL_TOOL_PROMPT, st_user, agent_latency
             )
             total_tokens += tok
@@ -193,7 +198,9 @@ async def run_unified_nat_orchestration(
             if active_query is None:
                 tool_out = "An error occurred while execusting the query: no sql_query from Sql_Generator"
             else:
-                tool_out = execute_sql_tool(active_query, connection_string)
+                tool_out = await asyncio.to_thread(
+                    execute_sql_tool, active_query, connection_string
+                )
 
             last_sql_tool_output = tool_out
             _log_message(transcript, "Sql_tool", tool_out)
@@ -203,7 +210,7 @@ async def run_unified_nat_orchestration(
                 f"Sql_Generator:\n{sg_content}\n\n"
                 f"Sql_tool output:\n{tool_out}\n"
             )
-            critic_content, tok = chat_completion(
+            critic_content, tok = await chat_completion(
                 "Sql_Execution_Critic",
                 sql_execution_critic_prompt(schema_text),
                 critic_user,
@@ -246,7 +253,7 @@ async def run_unified_nat_orchestration(
             f"Sql_Generator:\n{sg_content}\n\n"
             f"Sql_tool output:\n{last_sql_tool_output}\n"
         )
-        insight_content, tok = chat_completion(
+        insight_content, tok = await chat_completion(
             "Insight_Generator",
             INSIGHT_GENERATOR_PROMPT,
             insight_user,
@@ -270,7 +277,7 @@ async def run_unified_nat_orchestration(
             f"Carry forward:\n{json.dumps(selector_context, ensure_ascii=False)}\n\n"
             f"If updated_question_override is set, use it for retrieval:\n{updated_question_override or ''}"
         )
-        sel_content, tok = chat_completion(
+        sel_content, tok = await chat_completion(
             "Selector_agent", SELECTOR_AGENT_PROMPT, sel_user, agent_latency
         )
         total_tokens += tok
@@ -296,7 +303,7 @@ async def run_unified_nat_orchestration(
             {"role": "system", "content": LLM_ANSWER_MAKER_PROMPT},
             {"role": "user", "content": lam_user},
         ]
-        lam_content, tok = chat_completion_raw_messages(
+        lam_content, tok = await chat_completion_raw_messages(
             "llm_answer_maker", lam_messages, agent_latency
         )
         total_tokens += tok
@@ -313,7 +320,7 @@ async def run_unified_nat_orchestration(
                 {"role": "system", "content": CRITIC_AGENT_PROMPT},
                 {"role": "user", "content": crit_user},
             ]
-            crit_content, tok = chat_completion_raw_messages(
+            crit_content, tok = await chat_completion_raw_messages(
                 "critic_agent", crit_messages, agent_latency
             )
             total_tokens += tok
@@ -331,7 +338,7 @@ async def run_unified_nat_orchestration(
                 f"Critic requested more context. feedback_query:\n{fq}\n\n"
                 f"Original selector payload:\n{sel_content}"
             )
-            sel_content2, tok = chat_completion(
+            sel_content2, tok = await chat_completion(
                 "Selector_agent", SELECTOR_AGENT_PROMPT, sel_user2, agent_latency
             )
             total_tokens += tok
@@ -349,7 +356,7 @@ async def run_unified_nat_orchestration(
                 {"role": "system", "content": LLM_ANSWER_MAKER_PROMPT},
                 {"role": "user", "content": lam_user2},
             ]
-            last_lam, tok = chat_completion_raw_messages(
+            last_lam, tok = await chat_completion_raw_messages(
                 "llm_answer_maker", lam_messages2, agent_latency
             )
             total_tokens += tok
@@ -369,7 +376,7 @@ async def run_unified_nat_orchestration(
     elif analysis_type in ("SQL-based", "Both-dependent", "Both-independent"):
         sem_early = False
         critic_snap: str | None = None
-        insight_content, sql_query, sql_tool_out, sem_early, critic_snap = run_sql_chain()
+        insight_content, sql_query, sql_tool_out, sem_early, critic_snap = await run_sql_chain()
         selector_context["sql_query"] = sql_query
 
         for msg in reversed(transcript):
@@ -418,7 +425,7 @@ async def run_unified_nat_orchestration(
                     f"Insight_Generator output:\n{insight_content}\n\n"
                     f"Initial question:\n{query}\n"
                 )
-            qt_content, tok = chat_completion(
+            qt_content, tok = await chat_completion(
                 "query_transformer",
                 QUERY_TRANSFORMER_PROMPT,
                 qt_user,
@@ -463,7 +470,7 @@ async def run_unified_nat_orchestration(
                     final_answer = fb
     else:
         # Unknown routing - attempt SQL then semantic
-        insight_content, sql_query, _, _, _ = run_sql_chain()
+        insight_content, sql_query, _, _, _ = await run_sql_chain()
         llm_answer = await run_semantic_chain(
             selector_extra="Fallback: routing classification unclear; run semantic enrichment.",
             updated_question_override=query,
@@ -477,7 +484,7 @@ async def run_unified_nat_orchestration(
         }
 
     # --- Format final answer (same helper as legacy stack) ---
-    formated_answer = inf.formating_final_answer(final_answer)
+    formated_answer = await asyncio.to_thread(inf.formating_final_answer, final_answer)
     formated_final_answer = json.loads(
         formated_answer.replace("```json", "").replace("```", "").strip()
     )
@@ -518,7 +525,7 @@ async def run_unified_nat_orchestration(
 
     if python_code:
         response["python_code"] = python_code
-        generated_plot = inf.plot_to_base64(python_code)
+        generated_plot = await asyncio.to_thread(inf.plot_to_base64, python_code)
         if generated_plot:
             response["plot_base64"] = "data:image/png;base64," + generated_plot
         else:
