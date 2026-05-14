@@ -604,12 +604,38 @@ async def extract_context(question: str = None, vector_weight: float = 0.5, grap
         # ---- NIM reranker (NVIDIA llama-nemotron-rerank-1b-v2) -----------
         # Honors ENABLE_RERANKER toggle and RERANKER_TOP_N in unified.env.
         # On any reranker failure, returns the original order trimmed to top_n.
+        _bar = "=" * 72
+        print(
+            f"\n{_bar}\n"
+            f">>> NIM-RERANKER :: CALL-SITE REACHED (inference.fetch_vector_context) <<<\n"
+            f"{_bar}\n"
+            f"about to call rerank_chunks(...)  input_chunks = {len(chunks)}\n"
+            f"{_bar}\n",
+            flush=True,
+        )
         try:
             from utility.reranker import rerank_chunks
 
             final_chunks = rerank_chunks(question, chunks)
+            print(
+                f"\n{_bar}\n"
+                f">>> NIM-RERANKER :: CALL-SITE RETURNED <<<\n"
+                f"{_bar}\n"
+                f"rerank_chunks returned {len(final_chunks)} chunks\n"
+                f"{_bar}\n",
+                flush=True,
+            )
         except Exception as e:
-            print(f"[reranker] disabled or failed ({e}); using retrieval order")
+            print(
+                f"\n{_bar}\n"
+                f">>> NIM-RERANKER :: CALL-SITE EXCEPTION <<<\n"
+                f"{_bar}\n"
+                f"error_type    = {type(e).__name__}\n"
+                f"error_message = {e}\n"
+                f"falling back to retrieval order, top-{rerank_top_n} of {len(chunks)}\n"
+                f"{_bar}\n",
+                flush=True,
+            )
             final_chunks = chunks[:rerank_top_n]
 
         result_list = {"chunks": [], "sources": []}
