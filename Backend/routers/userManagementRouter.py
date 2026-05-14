@@ -727,17 +727,27 @@ async def get_user_questions(request: Request):
         if not email:
             raise HTTPException(status_code=400, detail="Missing 'email' in request body.")
 
-        # Query the Cosmos DB container
+        # Query the metadata DB (Cosmos or Mongo -" chosen by METADATA_BACKEND).
+        # Cosmos SQL DISTINCT has no direct MongoDB equivalent without an
+        # aggregation pipeline, so we over-fetch (3?-- the target) and dedupe
+        # in Python.  Single Python path works for both backends.
         query = (
-            "SELECT DISTINCT TOP 7 c.question FROM c WHERE c.createdBy = @createdBy "
+            "SELECT TOP 21 c.question, c.createdAt FROM c WHERE c.createdBy = @createdBy "
             "ORDER BY c.createdAt DESC"
         )
         params = [{"name": "@createdBy", "value": email}]
 
         items = list(qa_container.query_items(query=query, parameters=params, enable_cross_partition_query=True))
 
-        # Extract questions from the results
-        questions = [item["question"] for item in items]
+        # Dedupe while preserving most-recent-first order; cap at 7.
+        seen, questions = set(), []
+        for it in items:
+            q = it.get("question")
+            if q and q not in seen:
+                seen.add(q)
+                questions.append(q)
+                if len(questions) >= 7:
+                    break
 
         return questions if questions else []
 

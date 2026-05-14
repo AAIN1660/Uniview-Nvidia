@@ -75,8 +75,24 @@ COSMOS_ENDPOINT      = _clean_env(os.getenv("COSMOS_ENDPOINT"))
 COSMOS_KEY           = _clean_env(os.getenv("COSMOS_KEY"))
 TOKEN_PER_CREDIT     = _clean_env(os.getenv("TOKEN_PER_CREDIT"))
 
-client   = CosmosClient(url=COSMOS_ENDPOINT, credential=COSMOS_KEY)
-database = client.get_database_client(COSMOS_DATABASE_NAME)
+# -----------------------------------------------------------------------------
+# Metadata document store backend selector  (METADATA_BACKEND=mongo|cosmos).
+# See utility/mongo_document_store.py -" the Mongo wrapper exposes the exact
+# same Cosmos-API surface used everywhere in this file (read, get_container_client,
+# query_items, upsert_item, replace_item, delete_item, etc.).
+# -----------------------------------------------------------------------------
+_METADATA_BACKEND = (_clean_env(os.getenv("METADATA_BACKEND")) or "cosmos").lower()
+if _METADATA_BACKEND == "mongo":
+    from utility.mongo_document_store import get_database as _get_mongo_db
+    print(f"[metadata-db] (utility.main) backend=mongo db={os.getenv('MONGO_DATABASE_NAME')}")
+    database = _get_mongo_db(COSMOS_DATABASE_NAME)
+else:
+    print(f"[metadata-db] (utility.main) backend=cosmos db={COSMOS_DATABASE_NAME}")
+    client   = CosmosClient(url=COSMOS_ENDPOINT, credential=COSMOS_KEY)
+    database = client.get_database_client(COSMOS_DATABASE_NAME)
+# Legacy Cosmos init (kept for rollback reference):
+# client   = CosmosClient(url=COSMOS_ENDPOINT, credential=COSMOS_KEY)
+# database = client.get_database_client(COSMOS_DATABASE_NAME)
 
 key                       = AZURE_SEARCH_ADMIN_KEY
 azure_search_credential   = AzureKeyCredential(key)
@@ -105,19 +121,19 @@ COSMOS_CONTAINER_NAMES = {
 
 
 def _validate_cosmos_configuration() -> None:
-    """Log/validate Cosmos DB resources at startup."""
+    """Log/validate the active metadata DB (Cosmos or Mongo) at startup."""
+    tag = f"[metadata-db:{_METADATA_BACKEND}]"
     print(
-        "[cosmos] endpoint=", COSMOS_ENDPOINT,
-        " database=", COSMOS_DATABASE_NAME,
+        tag, "database=", COSMOS_DATABASE_NAME,
         " containers=", COSMOS_CONTAINER_NAMES,
     )
     try:
         database.read()
         for name in COSMOS_CONTAINER_NAMES.values():
             database.get_container_client(name).read()
-        print("[cosmos] validation succeeded.")
+        print(tag, "validation succeeded.")
     except Exception as exc:
-        print("[cosmos] validation failed:", exc)
+        print(tag, "validation failed:", exc)
 
 
 @asynccontextmanager

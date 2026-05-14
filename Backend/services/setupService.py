@@ -78,20 +78,46 @@ def _create_container_compat(database, container_id: str):
 
 async def create_service():
 
-	# Create Cosmos DB & Containers
-	client = get_cosmos_client()
-	database = client.create_database_if_not_exists(id=COSMOS_DB_NAME)
+	# -------------------------------------------------------------------------
+	# Metadata document store backend selector  (METADATA_BACKEND=mongo|cosmos)
+	# -------------------------------------------------------------------------
+	# MongoDB Community Edition lazily creates DBs and collections on first
+	# write, so there is no provisioning step -" we just resolve container
+	# handles via the Cosmos-API-compatible wrapper and run the same seed
+	# routines (super-admin + default configuration) we run on Cosmos.
+	#
+	# Cosmos path is preserved verbatim below for one-flag rollback.
+	# -------------------------------------------------------------------------
+	backend = (os.getenv("METADATA_BACKEND") or "cosmos").strip().strip('"').strip("'").lower()
 
-	user_container = _create_container_compat(database, USER_CONTAINER_NAME)
-	transaction_container = _create_container_compat(database, TRANSACTION_CONTAINER_NAME)
-	config_container = _create_container_compat(database, CONFIG_CONTAINER_NAME)
-	category_container = _create_container_compat(database, CATEGORY_CONTAINER_NAME)
-	qa_container = _create_container_compat(database, QA_CONTAINER_NAME)
-	upload_container = _create_container_compat(database, UPLOAD_CONTAINER_NAME)
-	db_connection = _create_container_compat(database, "db_connection")
-	data_dictionary = _create_container_compat(database, "data_dictionary")
+	if backend == "mongo":
+		from utility.mongo_document_store import get_database as _get_mongo_db
 
-	print("-----COSMOS CONTAINERS CREATED-----")
+		mongo_db = _get_mongo_db(COSMOS_DB_NAME)
+		user_container        = mongo_db.get_container_client(USER_CONTAINER_NAME)
+		transaction_container = mongo_db.get_container_client(TRANSACTION_CONTAINER_NAME)
+		config_container      = mongo_db.get_container_client(CONFIG_CONTAINER_NAME)
+		category_container    = mongo_db.get_container_client(CATEGORY_CONTAINER_NAME)
+		qa_container          = mongo_db.get_container_client(QA_CONTAINER_NAME)
+		upload_container      = mongo_db.get_container_client(UPLOAD_CONTAINER_NAME)
+		db_connection         = mongo_db.get_container_client("db_connection")
+		data_dictionary       = mongo_db.get_container_client("data_dictionary")
+		print("-----MONGO COLLECTIONS READY (lazy-created on first write)-----")
+	else:
+		# Create Cosmos DB & Containers (legacy path; runs only when METADATA_BACKEND=cosmos).
+		client = get_cosmos_client()
+		database = client.create_database_if_not_exists(id=COSMOS_DB_NAME)
+
+		user_container        = _create_container_compat(database, USER_CONTAINER_NAME)
+		transaction_container = _create_container_compat(database, TRANSACTION_CONTAINER_NAME)
+		config_container      = _create_container_compat(database, CONFIG_CONTAINER_NAME)
+		category_container    = _create_container_compat(database, CATEGORY_CONTAINER_NAME)
+		qa_container          = _create_container_compat(database, QA_CONTAINER_NAME)
+		upload_container      = _create_container_compat(database, UPLOAD_CONTAINER_NAME)
+		db_connection         = _create_container_compat(database, "db_connection")
+		data_dictionary       = _create_container_compat(database, "data_dictionary")
+		print("-----COSMOS CONTAINERS CREATED-----")
+
 	await create_superadmin(user_container)
 	print("-----SUPER ADMIN CREATED-----")
 	await initialize_configuration(config_container)
