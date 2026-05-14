@@ -330,29 +330,43 @@ class _NvidiaOpenAIEmbedding(OpenAIEmbedding):
         return await super()._aembed_with_retry(text, **kwargs)
 
 
-if embedding_backend() == "nvidia":
-    _nv_key = os.getenv("NVIDIA_EMBEDDING_API_KEY") or os.getenv("NVIDIA_API_KEY")
-    _nv_base = os.getenv("NVIDIA_EMBEDDING_BASE_URL", "https://integrate.api.nvidia.com/v1")
-    _nv_model = os.getenv("NVIDIA_EMBEDDING_MODEL", "nvidia/nv-embedqa-e5-v5")
-    text_embedder = _NvidiaOpenAIEmbedding(
-        api_key=_nv_key,
-        api_base=_nv_base,
-        api_version="2024-02-01",
-        api_type=OpenaiApiType.OpenAI,
-        model=_nv_model,
-        deployment_name=_nv_model,
-        max_retries=20,
-    )
-else:
-    text_embedder = OpenAIEmbedding(
-        api_key=GRAPH_RAG_OPENAI_API_KEY,
-        api_base=GRAPH_RAG_OPENAI_API_BASE,
-        api_version=GRAPH_RAG_OPENAI_API_VERSION,
-        api_type=OpenaiApiType.AzureOpenAI,
-        model=GRAPH_RAG_EMBEDDING_MODEL_NAME,
-        deployment_name=GRAPH_RAG_EMBEDDING_MODEL_NAME,
-        max_retries=20,
-    )
+def _clean_env_val(v):
+    """Strip whitespace and surrounding quotes (PowerShell env loader leaves them)."""
+    if v is None:
+        return ""
+    return v.strip().strip('"').strip("'")
+
+
+# -----------------------------------------------------------------------------
+# GraphRAG entity embedder
+# -----------------------------------------------------------------------------
+# IMPORTANT: This embedder is consumed by graphrag.query.*  to compare a user
+# question against the **entity vectors stored in the LanceDB parquet artifacts**
+# (graphragoutput/<run-id>/artifacts/create_final_entities.parquet, etc.).
+#
+# Those entity vectors were generated **at GraphRAG indexing time** by Azure
+# OpenAI ``text-embedding-3-small`` (1536-dim).  Once written they're immutable
+# — you can't change them without re-running the full GraphRAG pipeline.
+#
+# Therefore the query-time embedder for GraphRAG **must always be Azure
+# text-embedding-3-small (1536-dim)**, regardless of EMBEDDING_BACKEND.  If we
+# let it follow EMBEDDING_BACKEND=nvidia we'd produce 1024-dim query vectors and
+# LanceDB would reject them with:
+#   ValueError: Query vector size 1024 does not match index column size 1536
+#
+# The OTHER embedder (NVIDIA NIM nv-embedqa-e5-v5, 1024-dim) is used for
+# **Milvus/Zilliz** retrieval via ``generate_embeddings()`` below.  That's
+# independent and switched by EMBEDDING_BACKEND.
+# -----------------------------------------------------------------------------
+text_embedder = OpenAIEmbedding(
+    api_key=GRAPH_RAG_OPENAI_API_KEY,
+    api_base=GRAPH_RAG_OPENAI_API_BASE,
+    api_version=GRAPH_RAG_OPENAI_API_VERSION,
+    api_type=OpenaiApiType.AzureOpenAI,
+    model=GRAPH_RAG_EMBEDDING_MODEL_NAME,
+    deployment_name=GRAPH_RAG_EMBEDDING_MODEL_NAME,
+    max_retries=20,
+)
 
 
 # Localsearch_engine = LocalSearch(
@@ -518,46 +532,92 @@ async def extract_context(question: str = None, vector_weight: float = 0.5, grap
         return {}
  
     async def fetch_vector_context():
+        # ------------------------------------------------------------------
+        # Unified retrieval path (Azure AI Search OR Milvus/Zilliz):
+        #   1. Embed the question  (NVIDIA NIM nv-embedqa-e5-v5)
+        #   2. Retrieve top-K candidates (oversampled, default 20)
+        #         - Zilliz: dense GPU_CAGRA/AUTOINDEX + BM25 sparse hybrid (RRF)
+        #         - Azure:  dense HNSW + BM25 hybrid (legacy fallback)
+        #   3. Re-rank with NVIDIA NIM `llama-nemotron-rerank-1b-v2`
+        #      down to RERANKER_TOP_N (default 3) — replaces Azure's
+        #      QueryType.SEMANTIC server-side re-ranker so the same NVIDIA-
+        #      native reranker runs regardless of which backend is active.
+        # ------------------------------------------------------------------
         model = (
             embedding_model_id()
             if embedding_backend() == "nvidia"
             else os.getenv("AZURE_OPENAI_EMBEDDING_DEPLOYED_MODEL")
         )
-        #print("searchinggg", model)
         vector = generate_embeddings(question, client, model)
+
+        # Oversample for reranker. ZILLIZ_VECTOR_TOP_K kept as legacy override.
+        retrieve_top_k_raw = (
+            os.getenv("RETRIEVE_TOP_K")
+            or os.getenv("ZILLIZ_VECTOR_TOP_K")
+            or os.getenv("VECTOR_TOP_K")
+            or "20"
+        )
+        try:
+            retrieve_top_k = max(1, int(str(retrieve_top_k_raw).strip()))
+        except ValueError:
+            retrieve_top_k = 20
+
+        rerank_top_n_raw = os.getenv("RERANKER_TOP_N") or "3"
+        try:
+            rerank_top_n = max(1, int(str(rerank_top_n_raw).strip()))
+        except ValueError:
+            rerank_top_n = 3
+
+        # ---- Retrieval (backend split) -----------------------------------
+        chunks: list[dict] = []  # list of {"content","sourcepage"} for reranker
         if _vector_search_backend() == "zilliz":
             from utility import zilliz_client as _zilliz_client
 
-            top_k_raw = os.getenv("ZILLIZ_VECTOR_TOP_K") or os.getenv("VECTOR_TOP_K") or "3"
-            try:
-                top_k = max(1, int(str(top_k_raw).strip()))
-            except ValueError:
-                top_k = 3
-            hits = _zilliz_client.search_chunks(vector, top_k=top_k, category_ids=None)
-            result_list = {"chunks": [], "sources": []}
+            hits = _zilliz_client.search_chunks(
+                query_vector=vector,
+                query_text=question,
+                top_k=retrieve_top_k,
+                category_ids=None,
+            )
             for h in hits:
                 sp = h.get("sourcepage") or h.get("source_file") or h.get("title") or ""
                 ct = h.get("content") or h.get("text") or ""
-                result_list["sources"].append(sp)
-                result_list["chunks"].append(f"{sp}: {ct}")
-            return result_list
+                chunks.append({"sourcepage": str(sp), "content": str(ct)})
+        else:
+            # Azure AI Search path — keep BM25 hybrid (search_text + vector_queries)
+            # but drop QueryType.SEMANTIC; the NIM reranker below handles re-ranking
+            # uniformly across both backends.
+            vector_query = VectorizedQuery(
+                vector=vector, k_nearest_neighbors=retrieve_top_k, fields="contentVector"
+            )
+            results = search_client.search(
+                search_text=question,
+                vector_queries=[vector_query],
+                filter=category_filter,
+                top=retrieve_top_k,
+            )
+            for r in results:
+                chunks.append(
+                    {"sourcepage": r["sourcepage"], "content": r["content"]}
+                )
 
-        vector_query = VectorizedQuery(vector=vector, k_nearest_neighbors=3, fields="contentVector")
-        results = search_client.search(
-            search_text=question,
-            vector_queries=[vector_query],
-            filter=category_filter,
-            query_type=QueryType.SEMANTIC,
-            semantic_configuration_name='my-semantic-config',
-            query_caption=QueryCaptionType.EXTRACTIVE,
-            query_answer=QueryAnswerType.EXTRACTIVE,
-            top=3
-        )
+        # ---- NIM reranker (NVIDIA llama-nemotron-rerank-1b-v2) -----------
+        # Honors ENABLE_RERANKER toggle and RERANKER_TOP_N in unified.env.
+        # On any reranker failure, returns the original order trimmed to top_n.
+        try:
+            from utility.reranker import rerank_chunks
+
+            final_chunks = rerank_chunks(question, chunks)
+        except Exception as e:
+            print(f"[reranker] disabled or failed ({e}); using retrieval order")
+            final_chunks = chunks[:rerank_top_n]
+
         result_list = {"chunks": [], "sources": []}
-        for result in results:
-            result_dict = f"{result['sourcepage']}: {result['content']}"
-            result_list["sources"].append(result['sourcepage'])
-            result_list["chunks"].append(result_dict)
+        for c in final_chunks:
+            sp = c.get("sourcepage") or ""
+            ct = c.get("content") or ""
+            result_list["sources"].append(sp)
+            result_list["chunks"].append(f"{sp}: {ct}")
         return result_list
     
     async def fetch_graph_context():

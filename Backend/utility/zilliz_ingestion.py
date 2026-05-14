@@ -143,15 +143,68 @@ def _connect_milvus() -> None:
         raise
 
 
+def _dense_index_params() -> dict[str, Any]:
+    """
+    Pick dense ANN index based on ZILLIZ_INDEX_TYPE.
+
+    Default: AUTOINDEX (CPU; safe everywhere, including Zilliz Cloud serverless).
+    Set ZILLIZ_INDEX_TYPE=GPU_CAGRA on self-hosted Milvus GPU build (or Zilliz
+    Cloud Dedicated GPU cluster) for the NVIDIA-native cuVS graph index — gives
+    the same HNSW-style "navigable graph" semantics but built on the GPU.
+
+    Other supported values: HNSW, IVF_FLAT, GPU_IVF_FLAT, GPU_IVF_PQ.
+    """
+    idx = (os.getenv("ZILLIZ_INDEX_TYPE") or "AUTOINDEX").strip().upper()
+    if idx == "GPU_CAGRA":
+        return {
+            "metric_type": "COSINE",
+            "index_type":  "GPU_CAGRA",
+            "params": {
+                "intermediate_graph_degree": 64,
+                "graph_degree": 32,
+                "build_algo": "NN_DESCENT",
+            },
+        }
+    if idx == "HNSW":
+        return {
+            "metric_type": "COSINE",
+            "index_type":  "HNSW",
+            "params": {"M": 16, "efConstruction": 200},
+        }
+    # AUTOINDEX / GPU_IVF_FLAT / GPU_IVF_PQ / IVF_FLAT — pass through with empty params
+    return {"metric_type": "COSINE", "index_type": idx, "params": {}}
+
+
 def ensure_collection(collection_name: str, dim: int) -> Any:
-    """Create collection + index if missing (COSINE on embedding field)."""
-    from pymilvus import Collection, CollectionSchema, DataType, FieldSchema, utility
+    """
+    Create collection + indexes if missing.
+
+    Schema (new collections):
+      - dense  `embedding` field   → ZILLIZ_INDEX_TYPE (default AUTOINDEX)
+      - sparse `sparse`    field   → BM25 inverted index, fed by built-in BM25 function on `text`
+
+    Old collections (without `sparse`) are loaded as-is. Hybrid search in
+    zilliz_client.search_chunks gracefully falls back to dense-only when the
+    sparse field is missing — you only get the BM25 hybrid upgrade after a
+    fresh ingest into a new collection.
+    """
+    from pymilvus import (
+        Collection,
+        CollectionSchema,
+        DataType,
+        FieldSchema,
+        Function,
+        FunctionType,
+        utility,
+    )
     from pymilvus.exceptions import MilvusException
 
     if utility.has_collection(collection_name):
         col = Collection(collection_name)
         col.load()
         return col
+
+    enable_bm25 = (os.getenv("ZILLIZ_ENABLE_BM25", "true").strip().lower() == "true")
 
     fields = [
         FieldSchema(
@@ -161,19 +214,67 @@ def ensure_collection(collection_name: str, dim: int) -> Any:
             auto_id=False,
             max_length=512,
         ),
-        FieldSchema(name="text", dtype=DataType.VARCHAR, max_length=65535),
+        FieldSchema(
+            name="text",
+            dtype=DataType.VARCHAR,
+            max_length=65535,
+            enable_analyzer=enable_bm25,  # required for BM25 function
+        ),
         FieldSchema(name="source_file", dtype=DataType.VARCHAR, max_length=1024),
         FieldSchema(name="chunk_index", dtype=DataType.INT64),
         FieldSchema(name="embedding", dtype=DataType.FLOAT_VECTOR, dim=dim),
     ]
-    schema = CollectionSchema(fields, description="Uniview Step1 PDF chunks")
+    if enable_bm25:
+        fields.append(
+            FieldSchema(name="sparse", dtype=DataType.SPARSE_FLOAT_VECTOR)
+        )
+
+    schema = CollectionSchema(fields, description="Uniview PDF chunks (dense + BM25 sparse)")
+
+    if enable_bm25:
+        # BM25 function auto-populates `sparse` from `text` at insert time.
+        schema.add_function(
+            Function(
+                name="bm25_fn",
+                function_type=FunctionType.BM25,
+                input_field_names=["text"],
+                output_field_names=["sparse"],
+            )
+        )
+
     collection = Collection(collection_name, schema)
 
-    index_params = {"metric_type": "COSINE", "index_type": "AUTOINDEX", "params": {}}
+    # Dense ANN index (configurable: AUTOINDEX default, GPU_CAGRA when GPU available)
+    dense_params = _dense_index_params()
     try:
-        collection.create_index(field_name="embedding", index_params=index_params)
+        collection.create_index(field_name="embedding", index_params=dense_params)
     except MilvusException as e:
-        logger.warning("Index create note (may already exist): %s", e)
+        logger.warning(
+            "Dense index create failed for %s (%s); falling back to AUTOINDEX",
+            dense_params.get("index_type"),
+            e,
+        )
+        try:
+            collection.create_index(
+                field_name="embedding",
+                index_params={"metric_type": "COSINE", "index_type": "AUTOINDEX", "params": {}},
+            )
+        except MilvusException as e2:
+            logger.warning("Fallback AUTOINDEX also failed: %s", e2)
+
+    # Sparse BM25 inverted index (for hybrid keyword search)
+    if enable_bm25:
+        try:
+            collection.create_index(
+                field_name="sparse",
+                index_params={
+                    "metric_type": "BM25",
+                    "index_type":  "SPARSE_INVERTED_INDEX",
+                    "params": {"bm25_k1": 1.2, "bm25_b": 0.75},
+                },
+            )
+        except MilvusException as e:
+            logger.warning("BM25 sparse index create note (may already exist): %s", e)
 
     collection.load()
     return collection
