@@ -388,14 +388,34 @@ async def ask_api_call(request: Request):
             # =====================================================
             input_check = check_input(query)
             if not input_check["allowed"]:
+                blocked_msg = input_check.get(
+                    "message",
+                    "This request has been blocked due to safety policy restrictions.",
+                )
+                total = round(time.time() - req_start, 3)
+                print(f"[latency][total] generate_response_total_sec={total:.3f}")
                 return JSONResponse(
                     content={
-                        "answer": (
-                            "This request has been blocked "
-                            "due to safety policy restrictions."
-                        )
+                        "data_points":       {},
+                        "answer": {
+                            "final_answer": [
+                                {"text": blocked_msg, "type": "llm"},
+                                {"text": "",          "type": "llm"},
+                            ],
+                        },
+                        "answer_text":       blocked_msg,
+                        "thoughts":          "",
+                        "sql_query":         "",
+                        "token_usage":       0,
+                        "credit_used":       0,
+                        "feedback":          "",
+                        "dbresponse":        0,
+                        "guardrail_blocked": True,
+                        "guardrail_stage":   "input",
+                        "service_latencies": service_latencies,
+                        "total_latency_sec": total,
                     },
-                    status_code=200
+                    status_code=200,
                 )
 
             useai            = request_json["useai"]
@@ -535,8 +555,24 @@ async def ask_api_call(request: Request):
                 # =====================================================
                 output_check = check_output(askResponse.get("answer", ""))
                 if not output_check["allowed"]:
-                    askResponse["answer"]           = output_check["text"]
+                    blocked_msg = output_check.get("text") or (
+                        "This response has been blocked due to safety policy restrictions."
+                    )
+                    # Match the success-path shape the UI expects:
+                    #   answer = { "final_answer": [ {text, type}, ... ] }
+                    # Anything else makes the Insights tab silently render empty.
+                    askResponse["answer"] = {
+                        "final_answer": [
+                            {"text": blocked_msg, "type": "llm"},
+                            {"text": "",          "type": "llm"},
+                        ],
+                    }
+                    askResponse["answer_text"]      = blocked_msg
+                    askResponse["sql_query"]        = ""
+                    askResponse["python_code"]      = ""
+                    askResponse["plot_base64"]      = ""
                     askResponse["guardrail_blocked"] = True
+                    askResponse["guardrail_stage"]   = "output"
                 else:
                     askResponse["guardrail_blocked"] = False
 
@@ -563,10 +599,23 @@ async def ask_api_call(request: Request):
         except httpx.ReadTimeout:
             total = round(time.time() - req_start, 3)
             print(f"[latency][total] generate_response_total_sec={total:.3f}")
+            timeout_msg = "The request is taking longer than expected. Please try again."
             return JSONResponse(
                 {
-                    "answer": "The request is taking longer than expected. Please try again.",
-                    "answer_text": "The request is taking longer than expected. Please try again.",
+                    "answer": {
+                        "final_answer": [
+                            {"text": timeout_msg, "type": "llm"},
+                            {"text": "",          "type": "llm"},
+                        ],
+                    },
+                    "answer_text": timeout_msg,
+                    "data_points": {},
+                    "thoughts": "",
+                    "sql_query": "",
+                    "token_usage": 0,
+                    "credit_used": 0,
+                    "feedback": "",
+                    "dbresponse": 0,
                     "error": "NAT workflow timed out",
                     "guardrail_blocked": False,
                     "total_latency_sec": total,

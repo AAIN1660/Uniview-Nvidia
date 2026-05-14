@@ -127,9 +127,40 @@ if not all([host, database, username, password]):
     raise ValueError("SQL credentials missing. Set SQL_HOST, SQL_DATABASE, SQL_USERNAME, SQL_PASSWORD in unified.env")
 
 table_name = ["marsdata","unified_HR_data","healthcare_patient_details","healthcare_lab_results"]
-# Step 1: Connection string for Azure SQL Database
 
-connection_string = f'mssql+pyodbc:///?odbc_connect={urllib.parse.quote_plus(f"DRIVER={driver};SERVER={host};DATABASE={database};UID={username};PWD={password}")}'
+# ---------------------------------------------------------------------------
+# Step 1: Connection string
+# ---------------------------------------------------------------------------
+# Active backend: SQL Server 2022 Developer Edition installed locally
+# (native Windows install, same engine as Azure SQL Database).
+# The local instance ships a self-signed cert by default, so we explicitly
+# opt into `TrustServerCertificate=yes`.  These flags are harmless against
+# Azure SQL (Azure forces TLS regardless), so the same line works for
+# every backend we might switch to (Local SQL Server / Babelfish / Azure SQL).
+#
+# To switch backends, flip the credentials in unified.env — no code change
+# required here.
+# ---------------------------------------------------------------------------
+
+# ----- AZURE SQL (commented out — preserved for rollback) ------------------
+# connection_string = f'mssql+pyodbc:///?odbc_connect={urllib.parse.quote_plus(f"DRIVER={driver};SERVER={host};DATABASE={database};UID={username};PWD={password}")}'
+
+# ----- LOCAL SQL SERVER / BABELFISH (active) -------------------------------
+# Same connection-string shape works for both — they speak TDS on port 1433
+# and present a self-signed cert by default.
+connection_string = (
+    "mssql+pyodbc:///?odbc_connect="
+    + urllib.parse.quote_plus(
+        f"DRIVER={driver};"
+        f"SERVER={host};"
+        f"DATABASE={database};"
+        f"UID={username};"
+        f"PWD={password};"
+        "Encrypt=yes;"
+        "TrustServerCertificate=yes;"
+        "Connection Timeout=30;"
+    )
+)
 
 # Use the shared pooled engine so all SQL paths (schema reflection, schema
 # cache, ``execute_sql_tool``) share one connection pool per connection

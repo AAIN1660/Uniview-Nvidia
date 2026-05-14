@@ -49,6 +49,38 @@ async def execute_sql_query(
         if not all([host, database, username, password]):
             return "SQL execution error: Missing SQL connection environment variables."
 
+        # ------------------------------------------------------------------
+        # Connection string
+        # ------------------------------------------------------------------
+        # Active backend: SQL Server 2022 Developer Edition installed
+        # locally (same engine as Azure SQL).  The local instance presents
+        # a self-signed cert by default, so we explicitly trust it.  These
+        # flags are also safe against Azure SQL (Azure forces TLS
+        # regardless), so the same line works for any backend we might
+        # switch to (Local SQL Server / Babelfish / Azure SQL).
+        #
+        # To switch backends, flip the credentials in Backend/unified.env
+        # — no code change required here.
+        # ------------------------------------------------------------------
+
+        # ----- AZURE SQL (commented out — preserved for rollback) --------
+        # connection_string = (
+        #     "mssql+pyodbc:///?odbc_connect="
+        #     + urllib.parse.quote_plus(
+        #         f"DRIVER={driver};"
+        #         f"SERVER={host};"
+        #         f"DATABASE={database};"
+        #         f"UID={username};"
+        #         f"PWD={password};"
+        #         "Encrypt=yes;"
+        #         "TrustServerCertificate=no;"
+        #         "Connection Timeout=30;"
+        #     )
+        # )
+
+        # ----- LOCAL SQL SERVER / BABELFISH (active) ---------------------
+        # Same connection-string shape works for both — they speak TDS on
+        # port 1433 and present a self-signed cert by default.
         connection_string = (
             "mssql+pyodbc:///?odbc_connect="
             + urllib.parse.quote_plus(
@@ -58,7 +90,7 @@ async def execute_sql_query(
                 f"UID={username};"
                 f"PWD={password};"
                 "Encrypt=yes;"
-                "TrustServerCertificate=no;"
+                "TrustServerCertificate=yes;"
                 "Connection Timeout=30;"
             )
         )

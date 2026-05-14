@@ -1,0 +1,119 @@
+# =============================================================================
+# Babelfish for PostgreSQL — local stack
+# -----------------------------------------------------------------------------
+# Spin up a T-SQL-compatible database (Babelfish on Postgres) plus a browser
+# admin UI (Adminer) that replaces the "Azure Portal ? SQL Database" view.
+#
+# Bring up:
+#     docker compose -f babelfish/docker-compose.yml up -d
+#
+# Inspect tables / run queries (the "Azure Portal" replacement):
+#     Open http://localhost:8080
+#         System    : MS SQL (beta)        (Adminer's TDS-aware driver)
+#         Server    : babelfish
+#         Username  : sa
+#         Password  : Strong!Passw0rd
+#         Database  : unified
+#
+# Tear everything down (including the data volume):
+#     docker compose -f babelfish/docker-compose.yml down -v
+#
+# NOTE on the Babelfish image:
+#   AWS does not publish an "official" Babelfish image on Docker Hub — the
+#   officially supported managed offering is Aurora PostgreSQL with the
+#   Babelfish option enabled.  For self-host we use the community image
+#   maintained by the Babelfish-for-PostgreSQL project. If the tag below
+#   fails to pull on your network, alternatives:
+#       - babelfishpg/babelfishpg:latest
+#       - build from source: https://github.com/babelfish-for-postgresql
+# =============================================================================
+
+services:
+  # ---------------------------------------------------------------------------
+  # Babelfish for PostgreSQL
+  # ---------------------------------------------------------------------------
+  # Exposes two endpoints:
+  #   1433 -> TDS (T-SQL) — this is what the FastAPI backend connects to.
+  #            The ODBC Driver 18 + pyodbc client cannot tell this apart from
+  #            a real SQL Server, so no Python code changes are required.
+  #   5432 -> native PostgreSQL — used only for low-level admin (rarely).
+  # ---------------------------------------------------------------------------
+  babelfish:
+    image: babelfishpg/babelfish-postgresql:latest
+    container_name: unified-babelfish
+    restart: unless-stopped
+    environment:
+      # PostgreSQL super-user (port 5432). Keep separate from the T-SQL user.
+      POSTGRES_PASSWORD: "Strong!Passw0rd"
+
+      # T-SQL admin login (port 1433). This is the "sa-equivalent" that the
+      # backend uses. Username/password here must match unified.env's
+      # SQL_USERNAME / SQL_PASSWORD.
+      BABELFISH_USER: "sa"
+      BABELFISH_PASSWORD: "Strong!Passw0rd"
+
+      # single-db  -> one Babelfish DB == one T-SQL database (matches our
+      #               current Azure SQL setup which has a single DB "uniview").
+      # multi-db   -> only needed for cross-DB queries; adds complexity.
+      BABELFISH_MIGRATION_MODE: "single-db"
+    ports:
+      - "1433:1433"
+      - "5432:5432"
+    volumes:
+      - babelfish_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  # ---------------------------------------------------------------------------
+  # Adminer — browser UI = your Azure Portal equivalent
+  # ---------------------------------------------------------------------------
+  # Single-file PHP DB admin, ~12 MB. Lists tables, shows columns, lets you
+  # SELECT/INSERT/UPDATE, run arbitrary T-SQL. Connect using "MS SQL (beta)"
+  # against the babelfish service on port 1433.
+  # ---------------------------------------------------------------------------
+  adminer:
+    image: adminer:latest
+    container_name: unified-adminer
+    restart: unless-stopped
+    environment:
+      ADMINER_DEFAULT_SERVER: babelfish
+      ADMINER_DESIGN: pepa-linha
+    ports:
+      - "8080:8080"
+    depends_on:
+      babelfish:
+        condition: service_healthy
+
+  # ---------------------------------------------------------------------------
+  # mssql-tools — sqlcmd / bcp / sqlpackage on-demand
+  # ---------------------------------------------------------------------------
+  # Profile-gated: only starts when you explicitly opt in. Use this for
+  # schema export from Azure SQL or bulk imports into Babelfish without
+  # installing anything on Windows.
+  #
+  # Bring it up:
+  #     docker compose -f babelfish/docker-compose.yml --profile tools up -d mssql-tools
+  #
+  # Exec into it:
+  #     docker exec -it unified-mssql-tools bash
+  #     # then:  /opt/mssql-tools/bin/sqlcmd -S babelfish,1433 -U sa -P 'Strong!Passw0rd'
+  #
+  # Drop a .bacpac or .sql file into ./babelfish/migration/ on Windows and
+  # it appears at /migration inside the container.
+  # ---------------------------------------------------------------------------
+  mssql-tools:
+    image: mcr.microsoft.com/mssql-tools:latest
+    container_name: unified-mssql-tools
+    profiles: ["tools"]
+    command: tail -f /dev/null
+    depends_on:
+      babelfish:
+        condition: service_healthy
+    volumes:
+      - ./migration:/migration
+
+volumes:
+  babelfish_data:

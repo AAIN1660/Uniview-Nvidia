@@ -38,6 +38,13 @@ def _log_message(
     transcript: list[dict[str, Any]], name: str, content: str, role: str = "assistant"
 ) -> None:
     transcript.append({"name": name, "role": role, "content": content})
+    # Echo each agent turn to stdout so `nat serve` / uvicorn terminal shows the
+    # full multi-agent conversation, mirroring the legacy AutoGen
+    # `Console(team.run_stream(...))` behaviour. Toggle off in production by
+    # setting env var NAT_AGENT_STDOUT=0.
+    if os.getenv("NAT_AGENT_STDOUT", "1").strip() not in ("0", "false", "False", ""):
+        bar = "-" * 72
+        print(f"\n{bar}\n[{name}] (role={role})\n{bar}\n{content}\n{bar}", flush=True)
 
 
 def execute_sql_tool(query: str | None, connection_string: str) -> str:
