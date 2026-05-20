@@ -43,15 +43,13 @@ COSMOS_ENDPOINT = os.environ["COSMOS_ENDPOINT"]
 COSMOS_KEY = os.environ["COSMOS_KEY"]
 
 
-client = CosmosClient(url=COSMOS_ENDPOINT, credential=COSMOS_KEY)
-database = client.get_database_client(COSMOS_DATABASE_NAME)
-# container = database.get_container_client(COSMOS_UPLOAD_CONTAINER)
-transaction_container = database.get_container_client("transactions")
-user_container = database.get_container_client("gi_users")
-upload_container = database.get_container_client("gi_uploads")
-
-category_container = database.get_container_client("gi_category")
-feedback_container = database.get_container_client("gi_qa")
+from utility.cosmos_db import (
+    category_container,
+    feedback_container,
+    transaction_container,
+    upload_container,
+    user_container,
+)
 
 BLOB_STORAGE_CONNECTION_STRING = os.getenv("BLOB_STORAGE_CONNECTION_STRING")
 BLOB_STORAGE_CONTAINER_NAME=os.getenv("BLOB_STORAGE_CONTAINER_NAME")

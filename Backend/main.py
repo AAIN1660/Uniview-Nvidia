@@ -20,6 +20,11 @@ from utility.helper import *
 from utility.acsServiceHelper import get_similar_qa
 from utility.acsServiceHelper import qna_indexing
 from utility.guardrails import check_input, check_output
+from utility.validators import (
+    rule_validator,
+    grounding_validator,
+    output_validator,
+)
 from PyPDF2 import PdfReader, PdfWriter
 import fitz
 import re
@@ -49,7 +54,27 @@ def _clean_env(value, default=None):
 # NAT-only mode: always route generation through NeMo Agent Toolkit workflow.
 USE_NAT_WORKFLOW = True
 NAT_WORKFLOW_URL = _clean_env(os.getenv("NAT_WORKFLOW_URL"), "http://127.0.0.1:8090/generate")
-NAT_WORKFLOW_TIMEOUT_SEC = float(_clean_env(os.getenv("NAT_WORKFLOW_TIMEOUT_SEC"), "720"))
+NAT_WORKFLOW_TIMEOUT_SEC = float(_clean_env(os.getenv("NAT_WORKFLOW_TIMEOUT_SEC"), "1800"))
+
+
+def _nat_index_type(index_type_val: str | None) -> str:
+    """UI/config often sends 'vector' for SQL+doc apps; NAT should use hybrid for table analytics."""
+    it = str(index_type_val or "").strip().lower()
+    if it in ("vector", "vectors", "vector rag"):
+        return "hybrid"
+    return it or "hybrid"
+
+
+def _should_run_grounding_preflight(index_type_val: str | None) -> bool:
+    """
+    Optional Zilliz preflight before NAT. Off by default when NAT is enabled so SQL
+    questions (e.g. online vs in-store) are not blocked by PDF chunk relevance.
+    Set ENABLE_GROUNDING_PREFLIGHT=true to enforce for pure vector RAG.
+    """
+    flag = (os.getenv("ENABLE_GROUNDING_PREFLIGHT") or "false").strip().lower()
+    if flag not in ("true", "1", "yes"):
+        return False
+    return str(index_type_val or "").strip().lower() == "vector"
 
 # Set logging level to ERROR or CRITICAL
 logging.getLogger('azure.core.pipeline.policies.http_logging_policy').setLevel(logging.ERROR)
@@ -76,12 +101,22 @@ COSMOS_ENDPOINT      = _clean_env(os.getenv("COSMOS_ENDPOINT"))
 COSMOS_KEY           = _clean_env(os.getenv("COSMOS_KEY"))
 TOKEN_PER_CREDIT     = _clean_env(os.getenv("TOKEN_PER_CREDIT"))
 
-client   = CosmosClient(url=COSMOS_ENDPOINT, credential=COSMOS_KEY)
-database = client.get_database_client(COSMOS_DATABASE_NAME)
+from utility.cosmos_db import get_cosmos_client, get_database
+
+client   = None  # lazy — see _ensure_cosmos()
+database = None
+
+
+def _ensure_cosmos():
+    global client, database, feedback_container
+    if client is None:
+        client = get_cosmos_client()
+        database = get_database()
+        feedback_container = database.get_container_client("gi_qa")
 
 key                       = AZURE_SEARCH_ADMIN_KEY
 azure_search_credential   = AzureKeyCredential(key)
-feedback_container        = database.get_container_client("gi_qa")
+feedback_container        = None  # set in _ensure_cosmos()
 search_client             = SearchClient(
     endpoint=AZURE_SEARCH_SERVICE_ENDPOINT,
     index_name=AZURE_SEARCH_INDEX,
@@ -107,6 +142,7 @@ COSMOS_CONTAINER_NAMES = {
 
 def _validate_cosmos_configuration() -> None:
     """Log/validate Cosmos DB resources at startup."""
+    _ensure_cosmos()
     print(
         "[cosmos] endpoint=", COSMOS_ENDPOINT,
         " database=", COSMOS_DATABASE_NAME,
@@ -147,6 +183,127 @@ def datatimeupdate():
     return datetime.datetime.now()
 
 
+def as_ui_answer(text: str) -> dict:
+    """Shape plain text for ChatAnswer.tsx (expects answer.final_answer[])."""
+    message = (text or "").strip() or "No response available."
+    return {"final_answer": [{"type": "llm", "text": message}]}
+
+
+def _guardrail_response_text(askResponse: dict) -> str:
+    if askResponse.get("answer_text"):
+        return str(askResponse["answer_text"])
+    ans = askResponse.get("answer")
+    if isinstance(ans, str):
+        return ans
+    if isinstance(ans, dict) and "final_answer" in ans:
+        parts = []
+        for item in ans.get("final_answer", []):
+            if isinstance(item, dict):
+                t = str(item.get("text") or "").strip()
+                if t:
+                    parts.append(t)
+        return " ".join(parts)
+    return str(ans or "")
+
+
+def _blocked_json(message: str) -> dict:
+    msg = (message or "").strip() or "Request blocked."
+    return {
+        "answer": as_ui_answer(msg),
+        "answer_text": msg,
+        "guardrail_blocked": True,
+    }
+
+
+async def _retrieve_reranked_hits(
+    query: str,
+    category_ids: list | None = None,
+) -> list[dict]:
+    """Query embedding -> Zilliz -> reranker (RAG preflight)."""
+    from utility.embedding_config import create_embedding_vector, get_embedding_client
+    from utility import zilliz_client
+    from utility.reranker import rerank_chunks
+
+    client = get_embedding_client()
+    vector = create_embedding_vector(client, query, input_type="query")
+    top_k_raw = os.getenv("ZILLIZ_VECTOR_TOP_K") or os.getenv("VECTOR_TOP_K") or "8"
+    try:
+        top_k = max(1, int(str(top_k_raw).strip()))
+    except ValueError:
+        top_k = 8
+    # Cosmos category UUIDs are not stored on uniview_pdf_chunks; filter only when configured.
+    zilliz_category_field = (os.getenv("ZILLIZ_CATEGORY_FIELD") or "").strip()
+    zilliz_cat_filter = (
+        category_ids
+        if category_ids and zilliz_category_field
+        and zilliz_category_field.lower() not in ("none", "false", "0", "disabled", "-")
+        else None
+    )
+    try:
+        raw_hits = zilliz_client.search_chunks(
+            vector, top_k=top_k, category_ids=zilliz_cat_filter
+        )
+    except Exception as e:
+        print(f"[grounding] Zilliz search failed: {e}")
+        raw_hits = []
+    chunks = []
+    for h in raw_hits:
+        chunks.append(
+            {
+                "content": h.get("text") or h.get("content") or "",
+                "sourcepage": (
+                    h.get("source_file")
+                    or h.get("sourcepage")
+                    or h.get("title")
+                    or ""
+                ),
+            }
+        )
+    return rerank_chunks(query, chunks)
+
+
+async def _safe_process_query_and_update(
+    email, query, token_usage, askResponse, start_time, include_category=None
+):
+    """Persist credits/QA; do not fail the HTTP response if Cosmos is slow."""
+    try:
+        return await process_query_and_update(
+            email, query, token_usage, askResponse, start_time, include_category
+        )
+    except Exception as e:
+        print(f"[warn] process_query_and_update failed (answer still returned): {e}")
+        return askResponse
+
+
+def _apply_post_llm_guardrails(askResponse: dict) -> dict:
+    """Output business validator, then NeMo output guardrails."""
+    text = _guardrail_response_text(askResponse)
+    if "workflow error" in text.lower():
+        friendly = _friendly_workflow_error(text)
+        askResponse["answer"] = as_ui_answer(friendly)
+        askResponse["answer_text"] = friendly
+        askResponse["guardrail_blocked"] = False
+        return askResponse
+    out_check = output_validator.validate(text)
+    text = out_check.get("text", text)
+    askResponse["answer_text"] = text
+
+    if not out_check["allowed"]:
+        askResponse["answer"] = as_ui_answer(text)
+        askResponse["guardrail_blocked"] = True
+        return askResponse
+
+    output_check = check_output(text)
+    if not output_check["allowed"]:
+        askResponse["answer"] = as_ui_answer(output_check["text"])
+        askResponse["answer_text"] = output_check["text"]
+        askResponse["guardrail_blocked"] = True
+    else:
+        askResponse["guardrail_blocked"] = False
+
+    return askResponse
+
+
 def try_parse_final_answer(value):
     """
     Extracts final_answer JSON from NAT / AutoGen output.
@@ -185,6 +342,29 @@ def try_parse_final_answer(value):
     return None
 
 
+def _friendly_workflow_error(message: str) -> str:
+    """Turn raw NAT exception strings into UI-safe guidance."""
+    text = (message or "").strip()
+    lower = text.lower()
+    if "504" in text or "gateway timeout" in lower:
+        return (
+            "The AI workflow hit a gateway timeout (504) before finishing. "
+            "Complex questions can run 15–25+ minutes. Retry with a shorter question, "
+            "ensure NAT is running on port 8090, and raise NAT_WORKFLOW_TIMEOUT_SEC "
+            "or upstream proxy limits if needed."
+        )
+    if "timed out" in lower or "timeout" in lower:
+        return (
+            "This question timed out before completion. Document and semantic "
+            "questions run many AI steps (retrieval + multiple model calls) and "
+            "can take 15–25+ minutes. Try a shorter question, wait longer, or ask "
+            "your admin to raise NIM_CHAT_TIMEOUT_SEC in unified.env."
+        )
+    if text.lower().startswith("workflow error:"):
+        return text.split(":", 1)[-1].strip() or text
+    return text
+
+
 def normalize_nat_answer(nat_payload):
     """
     Converts NAT response into the same answer format expected by the UI:
@@ -195,6 +375,10 @@ def normalize_nat_answer(nat_payload):
       ]
     }
     """
+    # Case 0: NAT workflow error payload
+    if isinstance(nat_payload, dict) and nat_payload.get("error"):
+        return as_ui_answer(_friendly_workflow_error(str(nat_payload["error"])))
+
     # Case 1: NAT directly returns {"final_answer": [...]}
     if isinstance(nat_payload, dict) and "final_answer" in nat_payload:
         return nat_payload
@@ -314,21 +498,61 @@ def extract_answer_text_and_plot(nat_payload):
     return normalized, final_text, plot_base64, token_usage
 
 
-async def call_nat_workflow(query):
+async def call_nat_workflow(
+    query: str,
+    *,
+    email: str = "",
+    index_type: str = "hybrid",
+    explain_code: bool = False,
+    category: str = "",
+):
     """
     Calls the NeMo Agent Toolkit workflow service and normalizes the output
     into the existing frontend response contract.
     """
     nat_start = time.time()
+    user_input = json.dumps(
+        {
+            "query": query,
+            "email": email or "",
+            "index_type": index_type or "hybrid",
+            "explain_code": bool(explain_code),
+            "category": category or "",
+        }
+    )
     try:
         async with httpx.AsyncClient(timeout=NAT_WORKFLOW_TIMEOUT_SEC) as client:
             response = await client.post(
                 NAT_WORKFLOW_URL,
-                json={"user_input": query}
+                json={"user_input": user_input},
             )
             response.raise_for_status()
-    finally:
+    except httpx.ReadTimeout:
         print(f"[latency][service] nat_workflow_call_sec={time.time() - nat_start:.3f}")
+        timeout_msg = (
+            "The request is taking longer than expected. "
+            "Please try again with a simpler question."
+        )
+        return {
+            "data_points": {},
+            "answer": as_ui_answer(timeout_msg),
+            "answer_text": timeout_msg,
+            "thoughts": "",
+            "sql_query": "",
+            "token_usage": 0,
+            "credit_used": 0,
+            "feedback": "",
+            "nat_metadata": {
+                "service_layer": "nemo-agent-toolkit",
+                "workflow_url": NAT_WORKFLOW_URL,
+                "orchestration": "autogen-agentchat",
+                "model_provider": "nvidia-nim",
+                "latency_sec": round(time.time() - nat_start, 3),
+                "error": "NAT workflow timed out",
+            },
+        }
+
+    print(f"[latency][service] nat_workflow_call_sec={time.time() - nat_start:.3f}")
 
     try:
         nat_payload = response.json()
@@ -371,35 +595,50 @@ async def ask_api_call(request: Request):
     print('email', email)
 
     balance_start = time.time()
-    has_balance   = check_balance(email)
+    try:
+        has_balance = check_balance(email)
+    except Exception as exc:
+        print(f"[balance] Cosmos check failed: {exc}")
+        return JSONResponse(
+            status_code=503,
+            content={
+                "error": (
+                    "Unable to verify credit balance (Cosmos DB unreachable). "
+                    "Check your network/VPN, wait a moment, and retry."
+                ),
+            },
+        )
     service_latencies["check_balance_sec"] = round(time.time() - balance_start, 3)
     print(f"[latency][service] check_balance_sec={service_latencies['check_balance_sec']:.3f}")
 
     if has_balance:
         try:
+            _ensure_cosmos()
             start_time               = time.time()
             start_time_query_result_1 = datatimeupdate()
             print('start_time_query_result_1', start_time_query_result_1)
 
             query = request_json["question"]
 
-            # =====================================================
-            # INPUT GUARDRAILS
-            # =====================================================
+            # ── STEP 1: Rule-Based Validation ─────────────────────────
+            rule_check = rule_validator.validate(query)
+            if not rule_check["allowed"]:
+                return JSONResponse(
+                    content=_blocked_json(rule_check["message"]),
+                    status_code=200,
+                )
+
+            # ── STEP 2: NeMo Guardrails (input) ───────────────────────
             input_check = check_input(query)
             if not input_check["allowed"]:
                 return JSONResponse(
-                    content={
-                        "answer": (
-                            "This request has been blocked "
-                            "due to safety policy restrictions."
-                        )
-                    },
-                    status_code=200
+                    content=_blocked_json("Blocked by safety policy."),
+                    status_code=200,
                 )
 
             useai            = request_json["useai"]
             include_category = request_json["overrides"]["include_category"]
+            index_type_val   = index_type or request_json.get("index_type")
 
             cat_start = time.time()
             cat_list  = await get_all_categories()
@@ -473,18 +712,33 @@ async def ask_api_call(request: Request):
                             )
                             filter = f"({include_filter})"
 
+                        # ── STEP 3: Grounding (optional vector RAG preflight) ───
+                        if _should_run_grounding_preflight(index_type_val):
+                            hits = await _retrieve_reranked_hits(query)
+                            ground_check = grounding_validator.validate(query, hits)
+                            if not ground_check["allowed"]:
+                                return JSONResponse(
+                                    content=_blocked_json(ground_check["message"]),
+                                    status_code=200,
+                                )
+
                         print("-----------------Agenting Call happened-------------")
                         print("-----------------NAT Workflow Call happened-------------")
-                        askResponse = await call_nat_workflow(query)
+                        askResponse = await call_nat_workflow(
+                            query,
+                            email=email or "",
+                            index_type=_nat_index_type(index_type_val),
+                            explain_code=bool(explain_code),
+                        )
                         service_latencies["nat_workflow_sec"] = askResponse.get("nat_metadata", {}).get("latency_sec", 0)
                         print(f"[latency][service] nat_workflow_sec={service_latencies['nat_workflow_sec']:.3f}")
 
-                        askResponse["dbresponse"]      = 0
-                        askResponse["guardrail_blocked"] = False
+                        askResponse = _apply_post_llm_guardrails(askResponse)
+                        askResponse["dbresponse"] = 0
 
                         token_usage  = askResponse.get("token_usage", 0)
                         update_start = time.time()
-                        askResponse  = await process_query_and_update(
+                        askResponse  = await _safe_process_query_and_update(
                             email,
                             query,
                             token_usage,
@@ -524,27 +778,34 @@ async def ask_api_call(request: Request):
                     )
                     filter = f"({include_filter})"
 
+                # ── STEP 3: Grounding (optional vector RAG preflight) ───
+                if _should_run_grounding_preflight(index_type_val):
+                    hits = await _retrieve_reranked_hits(query)
+                    ground_check = grounding_validator.validate(query, hits)
+                    if not ground_check["allowed"]:
+                        return JSONResponse(
+                            content=_blocked_json(ground_check["message"]),
+                            status_code=200,
+                        )
+
                 print("-----------------Agenting Call happened-------------")
                 print("-----------------NAT Workflow Call happened-------------")
-                askResponse = await call_nat_workflow(query)
+                askResponse = await call_nat_workflow(
+                    query,
+                    email=email or "",
+                    index_type=_nat_index_type(index_type_val),
+                    explain_code=bool(explain_code),
+                )
                 service_latencies["nat_workflow_sec"] = askResponse.get("nat_metadata", {}).get("latency_sec", 0)
                 print(f"[latency][service] nat_workflow_sec={service_latencies['nat_workflow_sec']:.3f}")
 
-                # =====================================================
-                # OUTPUT GUARDRAILS
-                # =====================================================
-                output_check = check_output(askResponse.get("answer", ""))
-                if not output_check["allowed"]:
-                    askResponse["answer"]           = output_check["text"]
-                    askResponse["guardrail_blocked"] = True
-                else:
-                    askResponse["guardrail_blocked"] = False
-
-                askResponse['dbresponse'] = 0
+                # ── STEP 4 & 5: Output business + NeMo output guardrails ──
+                askResponse = _apply_post_llm_guardrails(askResponse)
+                askResponse["dbresponse"] = 0
 
                 token_usage  = askResponse.get("token_usage", 0)
                 update_start = time.time()
-                askResponse  = await process_query_and_update(
+                askResponse  = await _safe_process_query_and_update(
                     email,
                     query,
                     token_usage,
@@ -563,10 +824,11 @@ async def ask_api_call(request: Request):
         except httpx.ReadTimeout:
             total = round(time.time() - req_start, 3)
             print(f"[latency][total] generate_response_total_sec={total:.3f}")
+            timeout_msg = "The request is taking longer than expected. Please try again."
             return JSONResponse(
                 {
-                    "answer": "The request is taking longer than expected. Please try again.",
-                    "answer_text": "The request is taking longer than expected. Please try again.",
+                    "answer": as_ui_answer(timeout_msg),
+                    "answer_text": timeout_msg,
                     "error": "NAT workflow timed out",
                     "guardrail_blocked": False,
                     "total_latency_sec": total,

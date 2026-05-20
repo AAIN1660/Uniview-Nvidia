@@ -20,7 +20,6 @@ from utility.agent_prompts import (
     QUERY_TRANSFORMER_PROMPT,
     SELECTOR_AGENT_PROMPT,
     SQL_EXECUTOR_PROMPT,
-    SQL_TOOL_PROMPT,
     routing_agent_prompt,
     sql_execution_critic_prompt,
     sql_generator_prompt,
@@ -146,7 +145,10 @@ async def run_unified_nat_orchestration(
         critic_snapshot: str | None = None
         sg_content = ""
 
-        max_sql_rounds = 8
+        try:
+            max_sql_rounds = max(1, int(os.getenv("NAT_SQL_MAX_ROUNDS", "3")))
+        except ValueError:
+            max_sql_rounds = 3
         for round_idx in range(max_sql_rounds):
             gen_user_parts = [
                 f"User question: {query}",
@@ -180,15 +182,7 @@ async def run_unified_nat_orchestration(
             total_tokens += tok
             _log_message(transcript, "Sql_Executor", se_content)
 
-            # Sql_tool prompt-only agent - execution happens deterministically
-            st_user = (
-                f"Sql_Executor output:\n{se_content}\n\n"
-                f"Extract sql_query from Sql_Generator JSON if present; executable query:\n{q}"
-            )
-            st_content, tok = chat_completion(
-                "Sql_tool", SQL_TOOL_PROMPT, st_user, agent_latency
-            )
-            total_tokens += tok
+            # Sql_tool: execute SQL directly (no extra NIM round-trip)
             active_query = q if isinstance(q, str) and q.strip() else None
             if active_query is None:
                 tool_out = "An error occurred while execusting the query: no sql_query from Sql_Generator"
@@ -302,7 +296,10 @@ async def run_unified_nat_orchestration(
         total_tokens += tok
         _log_message(transcript, "llm_answer_maker", lam_content)
 
-        critic_rounds = 8
+        try:
+            critic_rounds = max(1, int(os.getenv("NAT_SEMANTIC_CRITIC_ROUNDS", "3")))
+        except ValueError:
+            critic_rounds = 3
         last_lam = lam_content
         for _ in range(critic_rounds):
             crit_user = json.dumps(
@@ -476,11 +473,23 @@ async def run_unified_nat_orchestration(
             "llm_answer": llm_answer or insight_content,
         }
 
-    # --- Format final answer (same helper as legacy stack) ---
-    formated_answer = inf.formating_final_answer(final_answer)
-    formated_final_answer = json.loads(
-        formated_answer.replace("```json", "").replace("```", "").strip()
+    # --- Format final answer for UI (NVIDIA NIM via formating_final_answer) ---
+    formated_answer = inf.formating_final_answer(
+        final_answer if isinstance(final_answer, dict) else {}
     )
+    try:
+        formated_final_answer = json.loads(
+            formated_answer.replace("```json", "").replace("```", "").strip()
+        )
+        if not isinstance(formated_final_answer, dict) or not formated_final_answer.get(
+            "final_answer"
+        ):
+            raise ValueError("NIM formatter returned empty final_answer")
+    except Exception as fmt_exc:
+        print("Warning: NIM format_final_answer parse failed, using local fallback:", fmt_exc)
+        formated_final_answer = inf.format_final_answer_for_ui(
+            final_answer if isinstance(final_answer, dict) else {}
+        )
 
     try:
         if isinstance(data_points, str) and data_points.strip():

@@ -2,19 +2,14 @@ from fastapi import HTTPException, File, Form,APIRouter,Query, Request
 from typing import List, Optional
 import os
 from datetime import datetime
-from azure.cosmos import CosmosClient
 import uuid
 from pydantic import BaseModel
+from utility.cosmos_db import category_container, user_container
 
 
 COSMOS_DATABASE_NAME = os.environ["COSMOS_DATABASE_NAME"]
 COSMOS_ENDPOINT = os.environ["COSMOS_ENDPOINT"]
 COSMOS_KEY = os.environ["COSMOS_KEY"]
-
-client = CosmosClient(url=COSMOS_ENDPOINT, credential=COSMOS_KEY)
-database = client.get_database_client(COSMOS_DATABASE_NAME)
-user_container = database.get_container_client("gi_users")
-category_container = database.get_container_client("gi_category")
 
 router = APIRouter()
 

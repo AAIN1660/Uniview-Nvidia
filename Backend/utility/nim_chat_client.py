@@ -41,17 +41,26 @@ def _model() -> str:
     return _clean_env(os.getenv("NVIDIA_MODEL"), "meta/llama-3.3-70b-instruct") or ""
 
 
+def _chat_timeout_sec() -> float:
+    raw = os.getenv("NIM_CHAT_TIMEOUT_SEC") or os.getenv("NVIDIA_CHAT_TIMEOUT_SEC") or "300"
+    try:
+        return max(30.0, float(str(raw).strip()))
+    except ValueError:
+        return 300.0
+
+
 def chat_completion(
     agent_name: str,
     system: str,
     user: str,
     agent_latency: dict[str, float],
     temperature: float = 0.1,
-    timeout: float = 120.0,
+    timeout: float | None = None,
 ) -> tuple[str, int]:
     """Returns (assistant_content, total_tokens). Updates agent_latency cumulative seconds."""
     t0 = time.time()
     client = _client()
+    req_timeout = _chat_timeout_sec() if timeout is None else timeout
     r = client.chat.completions.create(
         model=_model(),
         messages=[
@@ -59,7 +68,7 @@ def chat_completion(
             {"role": "user", "content": user},
         ],
         temperature=temperature,
-        timeout=timeout,
+        timeout=req_timeout,
     )
     elapsed = time.time() - t0
     agent_latency[agent_name] = agent_latency.get(agent_name, 0.0) + elapsed
@@ -74,16 +83,17 @@ def chat_completion_raw_messages(
     messages: list[dict[str, Any]],
     agent_latency: dict[str, float],
     temperature: float = 0.1,
-    timeout: float = 120.0,
+    timeout: float | None = None,
 ) -> tuple[str, int]:
     """Multi-turn chat for agents that need prior steps in-context."""
     t0 = time.time()
     client = _client()
+    req_timeout = _chat_timeout_sec() if timeout is None else timeout
     r = client.chat.completions.create(
         model=_model(),
         messages=messages,
         temperature=temperature,
-        timeout=timeout,
+        timeout=req_timeout,
     )
     elapsed = time.time() - t0
     agent_latency[agent_name] = agent_latency.get(agent_name, 0.0) + elapsed

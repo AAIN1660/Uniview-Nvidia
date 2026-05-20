@@ -46,10 +46,9 @@ COSMOS_UPLOAD_CONTAINER = os.environ["UPLOAD_CONTAINER_NAME"]
 COSMOS_ENDPOINT = os.environ["COSMOS_ENDPOINT"]
 COSMOS_KEY = os.environ["COSMOS_KEY"]
 
-client = CosmosClient(url=COSMOS_ENDPOINT, credential=COSMOS_KEY)
-database = client.get_database_client(COSMOS_DATABASE_NAME)
-container = database.get_container_client(COSMOS_UPLOAD_CONTAINER)
-tran_container = database.get_container_client("transactions")
+from utility.cosmos_db import client, database, tran_container, upload_container
+
+container = upload_container
 
 AZURE_OPENAI_API_REGION = os.environ["AZURE_OPENAI_API_REGION"]
 EMBEDDING_MODEL_DEPLOYMENT_NAME = os.environ["AZURE_OPENAI_EMBEDDING_DEPLOYED_MODEL"]

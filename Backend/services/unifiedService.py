@@ -26,11 +26,7 @@ COSMOS_ENDPOINT = os.environ["COSMOS_ENDPOINT"]
 COSMOS_KEY = os.environ["COSMOS_KEY"]
 
 
-client = CosmosClient(url=COSMOS_ENDPOINT, credential=COSMOS_KEY)
-database = client.get_database_client(COSMOS_DATABASE_NAME)
-tran_container = database.get_container_client("transactions")
-user_container = database.get_container_client("gi_users")
-uploads_container = database.get_container_client("gi_uploads")
+from utility.cosmos_db import tran_container, uploads_container, user_container
 
 
 class PromptData(BaseModel):

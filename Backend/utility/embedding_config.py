@@ -72,23 +72,20 @@ def create_embedding_vector(
     model = embedding_model_id()
     kwargs = embedding_create_kwargs(input_type=input_type)
     inp = text if isinstance(text, str) else str(text)
-    try:
-        response = client.embeddings.create(input=inp, model=model, **kwargs)
-        return response.data[0].embedding
-    except Exception as exc:
-        # Fallback for environments where NVIDIA /embeddings may be unavailable
-        # for a given account/model. This keeps retrieval working instead of
-        # failing the whole workflow.
-        message = str(exc).lower()
-        if embedding_backend() == "nvidia" and "404" in message:
-            azure_client = AzureOpenAI(
-                api_key=_clean_env(os.getenv("AZURE_OPENAI_API_KEY")),
-                api_version=_clean_env(os.getenv("AZURE_OPENAI_API_VERSION")),
-                azure_endpoint=_clean_env(os.getenv("AZURE_OPENAI_API_BASE")),
-            )
-            azure_model = _clean_env(os.getenv("AZURE_OPENAI_EMBEDDING_DEPLOYED_MODEL"))
-            if not azure_model:
-                raise
-            response = azure_client.embeddings.create(input=inp, model=azure_model)
+    import time as _time
+    max_retries = 5
+    retry_delay = 3
+    last_exc = None
+    for attempt in range(max_retries):
+        try:
+            response = client.embeddings.create(input=inp, model=model, **kwargs)
             return response.data[0].embedding
-        raise
+        except Exception as exc:
+            last_exc = exc
+            if embedding_backend() == "nvidia" and "404" in str(exc).lower():
+                wait = retry_delay * (attempt + 1)
+                print(f"[Embedding] NVIDIA 404 (attempt {attempt+1}/{max_retries}), retrying in {wait}s...")
+                _time.sleep(wait)
+            else:
+                raise
+    raise last_exc

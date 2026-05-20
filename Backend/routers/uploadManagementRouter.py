@@ -41,18 +41,18 @@ COSMOS_DATABASE_NAME = os.environ["COSMOS_DATABASE_NAME"]
 COSMOS_ENDPOINT = os.environ["COSMOS_ENDPOINT"]
 COSMOS_KEY = os.environ["COSMOS_KEY"]
  
-client = CosmosClient(url=COSMOS_ENDPOINT, credential=COSMOS_KEY)
-database = client.get_database_client(COSMOS_DATABASE_NAME)
+from utility.cosmos_db import (
+    transaction_container,
+    upload_container,
+    user_container,
+)
+
 BLOB_STORAGE_CONTAINER_NAME=os.getenv("BLOB_STORAGE_CONTAINER_NAME")
 BLOB_STORAGE_CONNECTION_STRING = os.getenv("BLOB_STORAGE_CONNECTION_STRING")
  
 blob_service_client= BlobServiceClient.from_connection_string(BLOB_STORAGE_CONNECTION_STRING)
  
 container_client = blob_service_client.get_container_client(BLOB_STORAGE_CONTAINER_NAME)
- 
-upload_container = database.get_container_client("gi_uploads")
-transaction_container = database.get_container_client("transactions")
-user_container = database.get_container_client("gi_users")
  
 service_endpoint = os.environ["AZURE_SEARCH_SERVICE_ENDPOINT"]
 index_name = os.environ["AZURE_SEARCH_INDEX_NAME"]

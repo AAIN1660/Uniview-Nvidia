@@ -21,7 +21,14 @@ import sys
 import tempfile
 import json
 from azure.storage.queue import QueueClient
-from tenacity import retry, wait_random_exponential, stop_after_attempt
+from azure.core.exceptions import ServiceRequestError
+from tenacity import (
+    retry,
+    retry_if_exception_type,
+    stop_after_attempt,
+    wait_random_exponential,
+)
+from utility.cosmos_db import reset_cosmos_connections
 import PyPDF2
 import openai
 from openai import AzureOpenAI
@@ -50,14 +57,16 @@ COSMOS_KEY = os.environ["COSMOS_KEY"]
 COSMOS_UPLOAD_CONTAINER = os.environ["UPLOAD_CONTAINER_NAME"]
 
 
-client = CosmosClient(url=COSMOS_ENDPOINT, credential=COSMOS_KEY)
-database = client.get_database_client(COSMOS_DATABASE_NAME)
-tran_container = database.get_container_client("transactions")
-user_container = database.get_container_client("gi_users")
-config_container = database.get_container_client("config")
-category_container = database.get_container_client("gi_category")
-feedback_container = database.get_container_client("gi_qa")
-upload_container = database.get_container_client(COSMOS_UPLOAD_CONTAINER)
+from utility.cosmos_db import (
+    category_container,
+    client,
+    config_container,
+    database,
+    feedback_container,
+    tran_container,
+    upload_container,
+    user_container,
+)
 
 
 storage_connection_string = os.getenv("BLOB_STORAGE_CONNECTION_STRING")
@@ -114,6 +123,32 @@ async def insert_qa_records(
     return item
 
 
+_balance_cache: dict[str, tuple[float, float]] = {}
+_BALANCE_CACHE_TTL_SEC = 60.0
+
+
+def _get_cached_balance(email: str):
+    entry = _balance_cache.get(email)
+    if not entry:
+        return None
+    balance, ts = entry
+    if time.time() - ts > _BALANCE_CACHE_TTL_SEC:
+        _balance_cache.pop(email, None)
+        return None
+    return balance
+
+
+def _set_cached_balance(email: str, balance: float) -> None:
+    _balance_cache[email] = (balance, time.time())
+
+
+@retry(
+    retry=retry_if_exception_type((ServiceRequestError, CosmosHttpResponseError)),
+    wait=wait_random_exponential(min=1, max=10),
+    stop=stop_after_attempt(3),
+    before_sleep=lambda _retry_state: reset_cosmos_connections(),
+    reraise=True,
+)
 def calculate_balance(email):
     # Fetching data from Cosmos DB transactions table
     # container_transactions = current_app.config['cosmos_db'].get_container_client("transactions")
@@ -148,6 +183,7 @@ def calculate_balance(email):
         end_time_check_balance_logicrun - start_time_check_balance_logicrun
     ).total_seconds()
     print("time_taken_check_balance_logicrun", time_taken_check_balance_logicrun)
+    _set_cached_balance(email, roundbalance)
     return roundbalance
 
 
@@ -276,7 +312,19 @@ def get_transaction_data():
 
 
 def check_balance(email):
-    balance = calculate_balance(email)
+    try:
+        balance = calculate_balance(email)
+    except Exception as exc:
+        cached = _get_cached_balance(email)
+        if cached is not None:
+            logging.warning(
+                "Cosmos balance query failed (%s); using cached balance %.2f",
+                exc,
+                cached,
+            )
+            balance = cached
+        else:
+            raise
     print("Balance", balance)
     if balance > 0:
         # Continue with the remaining code
@@ -378,9 +426,7 @@ def get_database(client):
 
 
 def get_config_container():
-    client = get_cosmos_client()
-    database = get_database(client)
-    return database.get_container_client(config_container)
+    return config_container
 
 
 # Step 2: Fetch tables from the specified schema dynamically
@@ -720,6 +766,9 @@ def get_tables_list_by_email(email: str):
 
 
 def formating_final_answer(context):
+    """Combine SQL + LLM answers into UI JSON via NVIDIA NIM (OpenAI-compatible)."""
+    from utility.nim_chat_client import chat_completion
+
     template = """
     Expert Final Answer Maker
     Input:
@@ -742,24 +791,17 @@ def formating_final_answer(context):
 
     """
     prompt = template.format(context=context)
-    print('###### prompt ###########', prompt)
-    response = openai_client.chat.completions.create(
-    model = os.getenv('GPT3_LLM_MODEL_DEPLOYMENT_NAME'),
-    messages =[
-    {"role": "system", "content": "You are a helpful assistant."},
-    {"role": "user", "content": f"{prompt}"}
-    ],
-    max_tokens=1024,
-    n=1,
-    temperature=0,
+    print("###### prompt ###########", prompt)
+    agent_latency: dict[str, float] = {}
+    answer, _tokens = chat_completion(
+        "final_answer_maker",
+        "You are a helpful assistant.",
+        prompt,
+        agent_latency,
+        temperature=0.0,
     )
-    print('***************** llm call happened for format_answer ********************')
-    answer = response.choices[0].message.content
-    # print("chunk_ids :", chunk_ids)
-    # print(f"Question: {query}\n")
-    # print(f"Answer: {answer}\n")
+    print("***************** NIM call happened for format_answer ********************")
     return answer
-    # print(f"Context chunks:\n {chunk_content}")
  
 
 

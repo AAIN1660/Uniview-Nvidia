@@ -121,14 +121,43 @@ if not all([host, database, username, password]):
     raise ValueError("SQL credentials missing. Set SQL_HOST, SQL_DATABASE, SQL_USERNAME, SQL_PASSWORD in unified.env")
 
 table_name = ["marsdata","unified_HR_data","healthcare_patient_details","healthcare_lab_results"]
-# Step 1: Connection string for Azure SQL Database
+def _odbc_connect_string() -> str:
+    """Azure SQL ODBC string (Encrypt + timeout required for reliable connections)."""
+    try:
+        connect_timeout = max(10, int(str(os.getenv("SQL_CONNECT_TIMEOUT_SEC", "30")).strip()))
+    except ValueError:
+        connect_timeout = 30
+    return (
+        f"DRIVER={driver};"
+        f"SERVER={host};"
+        f"DATABASE={database};"
+        f"UID={username};"
+        f"PWD={password};"
+        "Encrypt=yes;"
+        "TrustServerCertificate=no;"
+        f"Connection Timeout={connect_timeout};"
+    )
 
-connection_string = f'mssql+pyodbc:///?odbc_connect={urllib.parse.quote_plus(f"DRIVER={driver};SERVER={host};DATABASE={database};UID={username};PWD={password}")}'
+
+def _sqlalchemy_url() -> str:
+    return f"mssql+pyodbc:///?odbc_connect={urllib.parse.quote_plus(_odbc_connect_string())}"
+
+
+connection_string = _sqlalchemy_url()
+
 
 def _build_engine():
     # pool_pre_ping keeps stale pooled connections from surfacing as
     # "This Connection is closed" during long-running NAT sessions.
-    return create_engine(connection_string, pool_pre_ping=True, pool_recycle=1800)
+    try:
+        pool_recycle = max(300, int(str(os.getenv("SQL_POOL_RECYCLE_SEC", "1800")).strip()))
+    except ValueError:
+        pool_recycle = 1800
+    return create_engine(
+        _sqlalchemy_url(),
+        pool_pre_ping=True,
+        pool_recycle=pool_recycle,
+    )
 
 
 def _ensure_engine():
@@ -157,45 +186,70 @@ except Exception as _engine_exc:
     engine = None
 
 # Step 2: Fetch tables from the specified schema dynamically
-def get_schema_tables(engine, schema_name):
-    inspector = inspect(engine)
+def _schema_tables_from_inspector(inspector, schema_name: str) -> str:
     tables = inspector.get_table_names(schema=schema_name)
-    
     schema_details = ""
-    for table_name in tables:
-        columns = inspector.get_columns(table_name, schema=schema_name)
-        schema = f'schema = "{schema_name}", table_name = "{schema_name}.{table_name}", {table_name}_table = Table(\n'
+    for tbl in tables:
+        columns = inspector.get_columns(tbl, schema=schema_name)
+        schema = (
+            f'schema = "{schema_name}", table_name = "{schema_name}.{tbl}", '
+            f'{tbl}_table = Table(\n'
+        )
         for column in columns:
-            col_name = column['name']
-            col_type = column['type']
+            col_name = column["name"]
+            col_type = column["type"]
             primary_key = "primary_key=True" if column.get("primary_key", False) else ""
             nullable = "nullable=False" if not column["nullable"] else ""
             schema += f'    Column("{col_name}", {col_type}, {primary_key} {nullable}),\n'
-        schema = schema.rstrip(',\n')  # Remove the last comma and newline
+        schema = schema.rstrip(",\n")
         schema += "\n)\n\n"
         schema_details += schema
-
     return schema_details
 
-# Fetch tables from the dynamically specified schema
-try:
-    all_table_schemas = get_schema_tables(engine, category_name) if engine is not None else ""
-except Exception as _schema_exc:
-    print("Initial SQL schema load failed; continuing without startup schema:", _schema_exc)
-    all_table_schemas = ""
 
-print(all_table_schemas)
+def get_schema_tables(engine, schema_name):
+    """Reflect dbo (or SQL_SCHEMA) using a live connection — avoids closed pooled connections."""
+    eng = _ensure_engine()
+    with eng.connect() as conn:
+        return _schema_tables_from_inspector(inspect(conn), schema_name)
 
-params = urllib.parse.quote_plus(
-    f"DRIVER={driver};"
-    f"SERVER={host};"
-    f"DATABASE={database};"
-    f"UID={username};"
-    f"PWD={password};"
-    "Encrypt=yes;"
-    "TrustServerCertificate=no;"
-    "Connection Timeout=30;"
-)
+
+def _load_startup_table_schemas() -> str:
+    import time
+
+    global engine
+    last_err = None
+    for attempt in range(3):
+        try:
+            return get_schema_tables(engine, category_name)
+        except Exception as exc:
+            last_err = exc
+            try:
+                if engine is not None:
+                    engine.dispose()
+            except Exception:
+                pass
+            engine = _build_engine()
+            time.sleep(0.5 * (attempt + 1))
+    print(
+        "Initial SQL schema load failed; continuing without startup schema:",
+        last_err,
+    )
+    return ""
+
+
+# Fetch tables from the dynamically specified schema (startup preload)
+all_table_schemas = _load_startup_table_schemas()
+if all_table_schemas:
+    print(
+        f"[sql] Startup schema preload OK "
+        f"(schema={category_name}, tables reflected)"
+    )
+else:
+    print(
+        f"[sql] Startup schema preload skipped "
+        f"(schema will load per request)"
+    )
 
 
 
@@ -333,7 +387,13 @@ def extract_data(question, index_type, filter, explain_code, category):
     global category_filter
     global sql_code_explanation
     global graphrag_category
-    search_type = index_type
+    # GraphRAG LanceDB index is 1536-dim (Azure OpenAI) but NVIDIA embeddings are 1024-dim.
+    # Remap graph/hybrid to vector (Zilliz) to avoid dimension mismatch.
+    raw = index_type if index_type is not None else "vector"
+    raw = str(raw).strip().lower()
+    if raw in ("graph", "hybrid"):
+        raw = "vector"
+    search_type = raw
     graphrag_category = category
     category_filter = filter
     sql_code_explanation = explain_code
@@ -736,6 +796,26 @@ def build_generic_sql_fallback_answer(messages):
         "llm_answer": llm_answer,
     }
 
+
+def format_final_answer_for_ui(context: dict) -> dict:
+    """Build ChatAnswer-compatible JSON without an extra Azure OpenAI formatting call."""
+    sql_text = str((context or {}).get("sql_answer") or "").strip()
+    llm_text = str((context or {}).get("llm_answer") or "").strip()
+    items: list[dict[str, str]] = []
+    if sql_text:
+        items.append({"type": "sql", "text": sql_text})
+    if llm_text:
+        items.append({"type": "llm", "text": llm_text})
+    if not items:
+        items.append(
+            {
+                "type": "llm",
+                "text": "No answer could be generated from the available data. Please try again.",
+            }
+        )
+    return {"final_answer": items}
+
+
 def agent_output_jsonparser(chat_history, critic_agent):
     messages = chat_history.chat_history
     llm_answer_maker_data = [item for item in messages if item.get('name') == critic_agent]
@@ -783,9 +863,11 @@ async def start_agenting_process(query, index_type, filter, explain_code, catego
 
     if not selected_tables:
         if current_engine is not None:
-            selected_tables = inspect(current_engine).get_table_names(schema=category_name)
-            if not selected_tables:
-                selected_tables = inspect(current_engine).get_table_names()
+            with current_engine.connect() as conn:
+                insp = inspect(conn)
+                selected_tables = insp.get_table_names(schema=category_name)
+                if not selected_tables:
+                    selected_tables = insp.get_table_names()
 
     all_table_schemas = get_sql_table_schema(connection_string, selected_tables)
 
@@ -801,20 +883,21 @@ async def start_agenting_process(query, index_type, filter, explain_code, catego
         try:
             if current_engine is None:
                 raise RuntimeError('SQL engine unavailable')
-            inspector = inspect(current_engine)
             all_schema_dict = {}
-            for schema_name in inspector.get_schema_names():
-                if not schema_name or schema_name.startswith('db_'):
-                    continue
-                table_names = inspector.get_table_names(schema=schema_name)
-                for tbl in table_names:
-                    try:
-                        cols = inspector.get_columns(tbl, schema=schema_name)
-                        all_schema_dict[f'{schema_name}.{tbl}'] = {
-                            col['name']: str(col['type']) for col in cols
-                        }
-                    except Exception:
+            with current_engine.connect() as conn:
+                inspector = inspect(conn)
+                for schema_name in inspector.get_schema_names():
+                    if not schema_name or schema_name.startswith('db_'):
                         continue
+                    table_names = inspector.get_table_names(schema=schema_name)
+                    for tbl in table_names:
+                        try:
+                            cols = inspector.get_columns(tbl, schema=schema_name)
+                            all_schema_dict[f'{schema_name}.{tbl}'] = {
+                                col['name']: str(col['type']) for col in cols
+                            }
+                        except Exception:
+                            continue
             if all_schema_dict:
                 all_table_schemas = all_schema_dict
         except Exception as schema_exc:

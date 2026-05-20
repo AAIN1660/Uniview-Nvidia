@@ -35,13 +35,13 @@ COSMOS_ENDPOINT = _clean_env(os.getenv("COSMOS_ENDPOINT"))
 COSMOS_KEY = _clean_env(os.getenv("COSMOS_KEY"))
 
 
-client = CosmosClient(url=COSMOS_ENDPOINT, credential=COSMOS_KEY)
-database = client.get_database_client(COSMOS_DATABASE_NAME)
-tran_container = database.get_container_client(_clean_env(os.getenv("TRANSACTION_CONTAINER_NAME"), "transactions"))
-user_container = database.get_container_client(_clean_env(os.getenv("USER_CONTAINER_NAME"), "gi_users"))
-uploads_container = database.get_container_client(_clean_env(os.getenv("UPLOAD_CONTAINER_NAME"), "gi_uploads"))
-config_container = database.get_container_client(_clean_env(os.getenv("CONFIG_CONTAINER_NAME"), "config"))
-qa_container = database.get_container_client(_clean_env(os.getenv("QA_CONTAINER_NAME"), "gi_qa"))
+from utility.cosmos_db import (
+    client,
+    config_container,
+    qa_container,
+    transaction_container,
+    user_container,
+)
 
 
 class UserData(BaseModel):

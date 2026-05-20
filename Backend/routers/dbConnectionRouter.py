@@ -9,7 +9,6 @@ from pydantic import BaseModel
 from fastapi import Request, HTTPException,Form, status, APIRouter,Query
 import urllib
 import os
-from azure.cosmos import CosmosClient
 from fastapi.responses import JSONResponse
 from azure.cosmos import exceptions
 from typing import Optional
@@ -33,10 +32,10 @@ COSMOS_DATABASE_NAME = os.environ["COSMOS_DATABASE_NAME"]
 COSMOS_ENDPOINT = os.environ["COSMOS_ENDPOINT"]
 COSMOS_KEY = os.environ["COSMOS_KEY"]
 
-client = CosmosClient(url=COSMOS_ENDPOINT, credential=COSMOS_KEY)
-database = client.get_database_client(COSMOS_DATABASE_NAME)
-db_conn_container = database.get_container_client("db_connection")
-data_dictionary_container = database.get_container_client("data_dictionary")
+from utility.cosmos_db import (
+    data_dictionary_container,
+    db_conn_container,
+)
 
 class createDbConnection(BaseModel):
     host:str

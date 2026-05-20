@@ -27,6 +27,21 @@ def _zilliz_output_field_names() -> List[str]:
     return ["id", "text", "source_file", "chunk_index"]
 
 
+def _zilliz_category_field() -> Optional[str]:
+    """
+    Scalar field used to filter by Cosmos category id.
+    Leave unset (or set to none/false) when the collection has no category column
+    (e.g. uniview_pdf_chunks: id, text, source_file, chunk_index, embedding).
+    """
+    raw = os.getenv("ZILLIZ_CATEGORY_FIELD")
+    if raw is None:
+        return None
+    raw = raw.strip()
+    if not raw or raw.lower() in ("none", "false", "0", "disabled", "-"):
+        return None
+    return raw
+
+
 def _get_client() -> MilvusClient:
     uri = os.getenv("ZILLIZ_URI") or os.getenv("MILVUS_URI") or os.getenv("MILVUS_HOST")
     token = os.getenv("ZILLIZ_TOKEN") or os.getenv("MILVUS_TOKEN") or os.getenv("MILVUS_PASSWORD")
@@ -55,8 +70,8 @@ def search_chunks(
     out_fields = _zilliz_output_field_names()
 
     expr = None
-    if category_ids:
-        cat_field = (os.getenv("ZILLIZ_CATEGORY_FIELD") or "category").strip() or "category"
+    cat_field = _zilliz_category_field()
+    if category_ids and cat_field:
         quoted = ", ".join([f'\"{c}\"' for c in category_ids])
         expr = f"{cat_field} in [{quoted}]"
 
