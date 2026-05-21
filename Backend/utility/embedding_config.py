@@ -3,6 +3,7 @@ Shared embedding configuration for Azure OpenAI vs NVIDIA NIM (OpenAI-compatible
 
 NVIDIA nv-embedqa-e5-v5: use EMBEDDING_BACKEND=nvidia and set NVIDIA_EMBEDDING_*.
 See unified.env comments for VECTOR_SEARCH_DIMENSIONS (typically 1024 for E5-v5).
+Set NVIDIA_EMBEDDING_STRICT=1 to disable the optional Azure 404 fallback in create_embedding_vector.
 """
 from __future__ import annotations
 
@@ -76,6 +77,13 @@ def create_embedding_vector(
         response = client.embeddings.create(input=inp, model=model, **kwargs)
         return response.data[0].embedding
     except Exception as exc:
+        # Optional strict NVIDIA-only: no silent Azure fallback on 404.
+        if _clean_env(os.getenv("NVIDIA_EMBEDDING_STRICT"), "").lower() in (
+            "1",
+            "true",
+            "yes",
+        ):
+            raise
         # Fallback for environments where NVIDIA /embeddings may be unavailable
         # for a given account/model. This keeps retrieval working instead of
         # failing the whole workflow.

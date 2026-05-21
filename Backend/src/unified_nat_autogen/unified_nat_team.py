@@ -100,6 +100,14 @@ async def unified_nat_team(
                 category=category,
                 email=email,
             )
+            if isinstance(result, dict):
+                try:
+                    from utility.latency_report import print_nat_workflow_latency_table
+
+                    print_nat_workflow_latency_table(result)
+                except Exception:
+                    logger.exception("Latency table logging failed")
+
             return json.dumps(result)
 
         except Exception as e:

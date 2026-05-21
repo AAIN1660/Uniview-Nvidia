@@ -11,7 +11,7 @@ from fastapi.responses import JSONResponse, FileResponse, StreamingResponse
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from services import userCreditService, documentService, setupService
-from routers import categoryManagementRouter, userManagementRouter, dbConnectionRouter, configManagementRouter, uploadManagementRouter
+from routers import categoryManagementRouter, userManagementRouter, dbConnectionRouter, configManagementRouter, uploadManagementRouter, speechRouter
 from dotenv import load_dotenv
 from azure.cosmos import CosmosClient
 from azure.search.documents.aio import SearchClient
@@ -30,7 +30,9 @@ import io
 import asyncio
 import time
 from contextlib import asynccontextmanager
+from typing import Any
 from utility.inference import *
+from utility.latency_report import print_generate_response_latency_table
 
 
 load_dotenv("unified.env")
@@ -255,6 +257,46 @@ def normalize_nat_answer(nat_payload):
     }
 
 
+def unwrap_nat_orchestration_dict(nat_payload: Any) -> dict[str, Any] | None:
+    """
+    Find the inner dict returned by run_unified_nat_orchestration inside
+    NAT /generate HTTP envelopes ({value: str}, output, etc.).
+    """
+    if isinstance(nat_payload, dict):
+        if "thoughts" in nat_payload or "orchestration_total_latency_sec" in nat_payload:
+            return nat_payload
+        v = nat_payload.get("value")
+        if isinstance(v, str):
+            try:
+                inner = json.loads(v)
+                nested = unwrap_nat_orchestration_dict(inner)
+                if nested is not None:
+                    return nested
+            except Exception:
+                pass
+        for key in ("output", "result", "response", "content", "data"):
+            child = nat_payload.get(key)
+            if isinstance(child, dict):
+                nested = unwrap_nat_orchestration_dict(child)
+                if nested is not None:
+                    return nested
+            if isinstance(child, str):
+                try:
+                    inner = json.loads(child)
+                    nested = unwrap_nat_orchestration_dict(inner)
+                    if nested is not None:
+                        return nested
+                except Exception:
+                    pass
+    if isinstance(nat_payload, str):
+        try:
+            inner = json.loads(nat_payload)
+            return unwrap_nat_orchestration_dict(inner)
+        except Exception:
+            pass
+    return None
+
+
 def sanitize_final_answer(answer_obj):
     """
     Clean final_answer text for UI readability:
@@ -329,6 +371,27 @@ def extract_answer_text_and_plot(nat_payload):
     return normalized, final_text, plot_base64, token_usage
 
 
+def _merge_nat_service_latencies(
+    service_latencies: dict[str, Any],
+    nat_metadata: dict[str, Any] | None,
+) -> None:
+    """Copy NAT wall-clock and sub-timings into ``service_latencies`` for E2E table."""
+    if not isinstance(nat_metadata, dict):
+        return
+    sec = nat_metadata.get("latency_sec")
+    if sec is not None:
+        service_latencies["nat_workflow_sec"] = sec
+        print(f"[latency][service] nat_workflow_sec={sec:.3f}")
+    transport = nat_metadata.get("nat_transport_overhead_sec")
+    if transport is not None and float(transport) > 0:
+        service_latencies["nat_transport_overhead_sec"] = transport
+        print(f"[latency][service] nat_transport_overhead_sec={float(transport):.3f}")
+    parse_sec = nat_metadata.get("nat_response_parse_sec")
+    if parse_sec is not None and float(parse_sec) > 0:
+        service_latencies["nat_response_parse_sec"] = parse_sec
+        print(f"[latency][service] nat_response_parse_sec={float(parse_sec):.3f}")
+
+
 async def call_nat_workflow(query):
     """
     Calls the NeMo Agent Toolkit workflow service and normalizes the output
@@ -345,28 +408,87 @@ async def call_nat_workflow(query):
     finally:
         print(f"[latency][service] nat_workflow_call_sec={time.time() - nat_start:.3f}")
 
+    parse_start = time.time()
     try:
         nat_payload = response.json()
     except Exception:
         nat_payload = response.text
+    nat_response_parse_sec = round(time.time() - parse_start, 3)
 
     formatted_answer, final_answer_text, plot_base64, token_usage = extract_answer_text_and_plot(nat_payload)
 
+    orch = unwrap_nat_orchestration_dict(nat_payload)
+    thoughts_html = ""
+    sql_from_nat = ""
+    policy_nat_blob: dict[str, Any] | None = None
+    agent_latencies_nat: dict[str, Any] = {}
+    latency_steps_nat: list[Any] = []
+    data_points_from_nat: dict[str, Any] = {}
+    orch_total_sec: float | None = None
+    if isinstance(orch, dict):
+        th = orch.get("thoughts")
+        if isinstance(th, str):
+            thoughts_html = th.strip()
+        sq = orch.get("sql_query")
+        if sq is not None and str(sq).strip():
+            sql_from_nat = str(sq).strip()
+        pn = orch.get("policy_nat")
+        if isinstance(pn, dict):
+            policy_nat_blob = pn
+        al = orch.get("agent_latencies")
+        if isinstance(al, dict):
+            agent_latencies_nat = dict(al)
+        ls = orch.get("latency_steps")
+        if isinstance(ls, list):
+            latency_steps_nat = list(ls)
+        rd = orch.get("data_points")
+        if isinstance(rd, dict):
+            data_points_from_nat = rd
+        ot = orch.get("orchestration_total_latency_sec")
+        if ot is not None:
+            try:
+                orch_total_sec = round(float(ot), 3)
+            except (TypeError, ValueError):
+                orch_total_sec = None
+
+    nat_wall_sec = round(time.time() - nat_start, 3)
+    nat_transport_overhead_sec: float | None = None
+    inner_sum = round(
+        sum(
+            float(s.get("sec") or 0)
+            for s in latency_steps_nat
+            if isinstance(s, dict)
+        ),
+        3,
+    )
+    baseline = orch_total_sec if orch_total_sec is not None else inner_sum
+    if baseline and nat_wall_sec > baseline:
+        nat_transport_overhead_sec = round(nat_wall_sec - baseline, 3)
+    elif inner_sum and nat_wall_sec > inner_sum:
+        nat_transport_overhead_sec = round(nat_wall_sec - inner_sum, 3)
+
     response_payload = {
-        "data_points":   {},
+        "data_points":   data_points_from_nat,
         "answer":        formatted_answer,
         "answer_text":   final_answer_text,
-        "thoughts":      "",
-        "sql_query":     "",
+        "thoughts":      thoughts_html,
+        "sql_query":     sql_from_nat,
         "token_usage":   token_usage,
         "credit_used":   0,
         "feedback":      "",
+        "policy_nat":    policy_nat_blob,
         "nat_metadata": {
             "service_layer":    "nemo-agent-toolkit",
             "workflow_url":     NAT_WORKFLOW_URL,
             "orchestration":    "autogen-agentchat",
             "model_provider":   "nvidia-nim",
-            "latency_sec":      round(time.time() - nat_start, 3),
+            "latency_sec":      nat_wall_sec,
+            "nat_response_parse_sec": nat_response_parse_sec,
+            "nat_transport_overhead_sec": nat_transport_overhead_sec,
+            "agent_latencies": agent_latencies_nat,
+            "latency_steps": latency_steps_nat,
+            "orchestration_total_latency_sec": orch_total_sec,
+            "policy_nat":      policy_nat_blob,
         }
     }
     if plot_base64:
@@ -386,7 +508,8 @@ async def ask_api_call(request: Request):
     print('email', email)
 
     balance_start = time.time()
-    has_balance   = check_balance(email)
+    has_balance = check_balance(email)
+    print(f"[balance] helper_path has_balance={has_balance}")
     service_latencies["check_balance_sec"] = round(time.time() - balance_start, 3)
     print(f"[latency][service] check_balance_sec={service_latencies['check_balance_sec']:.3f}")
 
@@ -401,7 +524,10 @@ async def ask_api_call(request: Request):
             # =====================================================
             # INPUT GUARDRAILS
             # =====================================================
+            ig_start = time.time()
             input_check = check_input(query)
+            service_latencies["input_guardrail_sec"] = round(time.time() - ig_start, 3)
+            print(f"[latency][service] input_guardrail_sec={service_latencies['input_guardrail_sec']:.3f}")
             if not input_check["allowed"]:
                 blocked_msg = input_check.get(
                     "message",
@@ -409,6 +535,7 @@ async def ask_api_call(request: Request):
                 )
                 total = round(time.time() - req_start, 3)
                 print(f"[latency][total] generate_response_total_sec={total:.3f}")
+                print_generate_response_latency_table(service_latencies, total, nat_metadata=None)
                 return JSONResponse(
                     content={
                         "data_points":       {},
@@ -511,8 +638,7 @@ async def ask_api_call(request: Request):
                         print("-----------------Agenting Call happened-------------")
                         print("-----------------NAT Workflow Call happened-------------")
                         askResponse = await call_nat_workflow(query)
-                        service_latencies["nat_workflow_sec"] = askResponse.get("nat_metadata", {}).get("latency_sec", 0)
-                        print(f"[latency][service] nat_workflow_sec={service_latencies['nat_workflow_sec']:.3f}")
+                        _merge_nat_service_latencies(service_latencies, askResponse.get("nat_metadata"))
 
                         askResponse["dbresponse"]      = 0
                         askResponse["guardrail_blocked"] = False
@@ -562,13 +688,15 @@ async def ask_api_call(request: Request):
                 print("-----------------Agenting Call happened-------------")
                 print("-----------------NAT Workflow Call happened-------------")
                 askResponse = await call_nat_workflow(query)
-                service_latencies["nat_workflow_sec"] = askResponse.get("nat_metadata", {}).get("latency_sec", 0)
-                print(f"[latency][service] nat_workflow_sec={service_latencies['nat_workflow_sec']:.3f}")
+                _merge_nat_service_latencies(service_latencies, askResponse.get("nat_metadata"))
 
                 # =====================================================
                 # OUTPUT GUARDRAILS
                 # =====================================================
+                og_start = time.time()
                 output_check = check_output(askResponse.get("answer", ""))
+                service_latencies["output_guardrail_sec"] = round(time.time() - og_start, 3)
+                print(f"[latency][service] output_guardrail_sec={service_latencies['output_guardrail_sec']:.3f}")
                 if not output_check["allowed"]:
                     blocked_msg = output_check.get("text") or (
                         "This response has been blocked due to safety policy restrictions."
@@ -609,11 +737,17 @@ async def ask_api_call(request: Request):
             askResponse["service_latencies"] = service_latencies
             askResponse["total_latency_sec"] = round(time.time() - req_start, 3)
             print(f"[latency][total] generate_response_total_sec={askResponse['total_latency_sec']:.3f}")
+            print_generate_response_latency_table(
+                service_latencies,
+                askResponse["total_latency_sec"],
+                nat_metadata=askResponse.get("nat_metadata"),
+            )
             return JSONResponse(content=askResponse, status_code=200)
 
         except httpx.ReadTimeout:
             total = round(time.time() - req_start, 3)
             print(f"[latency][total] generate_response_total_sec={total:.3f}")
+            print_generate_response_latency_table(service_latencies, total, nat_metadata=None)
             timeout_msg = "The request is taking longer than expected. Please try again."
             return JSONResponse(
                 {
@@ -643,6 +777,7 @@ async def ask_api_call(request: Request):
             logging.exception("Exception in /ask")
             total = round(time.time() - req_start, 3)
             print(f"[latency][total] generate_response_total_sec={total:.3f}")
+            print_generate_response_latency_table(service_latencies, total, nat_metadata=None)
             return JSONResponse({"error": str(e)}, status_code=500)
 
     else:
@@ -768,6 +903,7 @@ def create_app():
         prefix="/uploadManagementRouter",
         tags=["Upload Service"]
     )
+    app.include_router(speechRouter.router, tags=["Speech"])
     return app
 
 

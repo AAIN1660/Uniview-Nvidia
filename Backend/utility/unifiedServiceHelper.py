@@ -37,6 +37,8 @@ from graphrag.query.structured_search.global_search.community_context import Glo
 from graphrag.vector_stores.lancedb import LanceDBVectorStore
 import asyncio
 
+from utility.graphrag_text_embedder import create_graphrag_text_embedder
+
 
 load_dotenv("unified.env")
 
@@ -144,15 +146,8 @@ llm = ChatOpenAI(
 
 token_encoder = tiktoken.get_encoding("cl100k_base")
 
-text_embedder = OpenAIEmbedding(
-    api_key=api_key,
-    api_base=api_base,
-    api_version=api_version,
-    api_type=OpenaiApiType.AzureOpenAI,
-    model=embedding_model,
-    deployment_name=embedding_model,
-    max_retries=20,
-)
+text_embedder = create_graphrag_text_embedder()
+
 Localcontext_builder = LocalSearchMixedContext(
                 community_reports=reports,
                 text_units=text_units,

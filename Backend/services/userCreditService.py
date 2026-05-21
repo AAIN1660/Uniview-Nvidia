@@ -3,8 +3,6 @@ from fastapi.responses import JSONResponse
 from azure.cosmos import exceptions
 from typing import Optional
 from pydantic import BaseModel
-from azure.cosmos import CosmosClient
-from azure.cosmos import CosmosClient
 from typing import List, Union, Dict, Any
 from fastapi.responses import JSONResponse
 from starlette.requests import Request
@@ -12,24 +10,13 @@ from datetime import datetime
 import os
 import uuid
 from utility.creditServiceHelper import *
-from utility.helper import get_active_categories
+from utility.helper import get_active_categories, category_container as _mongo_category_container
 import bcrypt
 from jose import jwt
 from datetime import datetime, timezone, timedelta
 
 
 router = APIRouter()
-
-COSMOS_DATABASE_NAME = os.environ["COSMOS_DATABASE_NAME"]
-COSMOS_ENDPOINT = os.environ["COSMOS_ENDPOINT"]
-COSMOS_KEY = os.environ["COSMOS_KEY"]
-
-
-client = CosmosClient(url=COSMOS_ENDPOINT, credential=COSMOS_KEY)
-database = client.get_database_client(COSMOS_DATABASE_NAME)
-tran_container = database.get_container_client("transactions")
-user_container = database.get_container_client("gi_users")
-uploads_container = database.get_container_client("gi_uploads")
 
 
 class UserData(BaseModel):
@@ -699,11 +686,11 @@ async def update_user_status(request: Request):
         # Update the user in the container
         user_container.upsert_item(existing_user)
 
-        balance = calculate_balance(email,transaction_container)
+        bal = await calculate_balance(email, transaction_container)
         response_data = {
             "message": "User status updated successfully",
             "role": existing_user.get("role"),
-            "balance": await balance,
+            "balance": bal,
             "status": existing_user.get("status"),
         }
         return JSONResponse(content=response_data)
@@ -715,11 +702,9 @@ async def update_user_status(request: Request):
 @router.put("/update_existing_users_categories")
 async def update_existing_users_categories(request: Request):
     try:
-        data = await request.json()
-        database_name = data.get("database_name")
-        database = client.get_database_client(database_name)
-        category_container = database.get_container_client("gi_category")
-        user_container = database.get_container_client("gi_users")
+        await request.json()
+        category_container = _mongo_category_container
+        from utility.helper import user_container as _usr_cat_update
         query = f"SELECT cat.id FROM cat WHERE cat.status = 1"
         cat_list = list(category_container.query_items(query, enable_cross_partition_query=True))
         cat_ids = [];
@@ -727,13 +712,13 @@ async def update_existing_users_categories(request: Request):
             cat_ids.append(cat['id'])
         # Check if the user exists
         query = f"SELECT * FROM c"
-        existing_users = list(user_container.query_items(query=query, enable_cross_partition_query=True))
+        existing_users = list(_usr_cat_update.query_items(query=query, enable_cross_partition_query=True))
         for user in existing_users:
             if len(user.get('categories', [])) > 1:
                 continue;
             else:
                 user['categories'] = cat_ids
-                user_container.upsert_item(user)
+                _usr_cat_update.upsert_item(user)
         return JSONResponse(content="Categories updated")
     except exceptions.CosmosHttpResponseError as cosmos_error:
         return {"message": f"Error occurred while updating user categories: {cosmos_error}"}

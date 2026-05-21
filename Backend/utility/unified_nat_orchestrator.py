@@ -16,6 +16,9 @@ from utility.agent_prompts import (
     CRITIC_AGENT_PROMPT,
     INSIGHT_GENERATOR_PROMPT,
     LLM_ANSWER_MAKER_PROMPT,
+    NAT_GROUNDING_POLICY_SYSTEM,
+    NAT_INPUT_POLICY_SYSTEM,
+    NAT_OUTPUT_POLICY_SYSTEM,
     QUERY_TRANSFORMER_PROMPT,
     SELECTOR_AGENT_PROMPT,
     SQL_EXECUTOR_PROMPT,
@@ -25,7 +28,17 @@ from utility.agent_prompts import (
     sql_generator_prompt,
 )
 from utility.helper import get_sql_engine
+from utility.latency_trace import LatencyTrace
 from utility.nim_chat_client import chat_completion, chat_completion_raw_messages
+from utility.policy_nat_agents import (
+    ctx_to_grounding_snippets,
+    nat_grounding_policy_enabled,
+    nat_input_policy_enabled,
+    nat_output_policy_enabled,
+    run_nat_grounding_policy,
+    run_nat_input_policy,
+    run_nat_output_policy,
+)
 
 
 def _fmt_schema(all_table_schemas: Any) -> str:
@@ -73,6 +86,49 @@ class _ChatHistoryShim:
         self.chat_history = chat_history
 
 
+def _thoughts_html_from_transcript(transcript: list[dict[str, Any]]) -> str:
+    """Turn orchestrator transcript into HTML for UI Thought process tab."""
+    parts: list[str] = []
+    for msg in transcript:
+        name = msg.get("name")
+        content = msg.get("content")
+        role = msg.get("role")
+        parts.append(
+            '<div style="border: 1px solid #ccc; padding: 20px; border-radius: 5px; width: fit-content;">'
+            f"<h2>{name}</h2><br /><h4>Role: {role}</h4><br />{content}</div>"
+        )
+    return "\n <br/> <br />".join(parts)
+
+
+def _policy_append(
+    trace: list[dict[str, Any]],
+    *,
+    phase: str,
+    allowed: bool | None,
+    detail: dict[str, Any] | None = None,
+) -> None:
+    row: dict[str, Any] = {"phase": phase, "allowed": allowed}
+    if detail:
+        row.update(detail)
+    trace.append(row)
+
+
+def _plain_text_from_formatted_answer(formated: Any) -> str:
+    """Join final_answer[].text for nat_output_policy."""
+    if not isinstance(formated, dict):
+        return str(formated or "").strip()
+    items = formated.get("final_answer")
+    if not isinstance(items, list):
+        return ""
+    parts: list[str] = []
+    for it in items:
+        if isinstance(it, dict):
+            t = str(it.get("text") or "").strip()
+            if t:
+                parts.append(t)
+    return "\n".join(parts).strip()
+
+
 def _detect_analysis_type_from_text(content: str) -> str:
     c = content or ""
     if "Both-dependent" in c:
@@ -96,6 +152,8 @@ async def run_unified_nat_orchestration(
     email: str,
     all_table_schemas: Any,
     connection_string: str,
+    prep_steps: list[dict[str, Any]] | None = None,
+    workflow_start: float | None = None,
 ) -> dict[str, Any]:
     """
     End-to-end unified workflow without AutoGen.
@@ -103,21 +161,82 @@ async def run_unified_nat_orchestration(
     """
     from utility import inference as inf
 
-    start = time.time()
+    start = workflow_start if workflow_start is not None else time.time()
     agent_latency: dict[str, float] = {}
+    trace = LatencyTrace()
+    if prep_steps:
+        trace.extend(prep_steps)
     transcript: list[dict[str, Any]] = []
     total_tokens = 0
+    policy_nat_trace: list[dict[str, Any]] = []
 
     schema_text = _fmt_schema(all_table_schemas)
 
+    async def _llm(name: str, system: str, user: str) -> tuple[str, int]:
+        t0 = time.perf_counter()
+        content, tok = await chat_completion(name, system, user, agent_latency)
+        trace.record(f"LLM: {name}", time.perf_counter() - t0)
+        return content, tok
+
+    async def _llm_messages(name: str, messages: list[dict[str, Any]]) -> tuple[str, int]:
+        t0 = time.perf_counter()
+        content, tok = await chat_completion_raw_messages(name, messages, agent_latency)
+        trace.record(f"LLM: {name}", time.perf_counter() - t0)
+        return content, tok
+
+    async def _extract_context_timed(question: str) -> dict[str, Any]:
+        t0 = time.perf_counter()
+        ctx = await inf.extract_context(question=question)
+        sub = inf.pop_extract_context_latencies()
+        mode = sub.get("retrieval:search_mode", "retrieval")
+        trace.record(f"Retrieval ({mode})", time.perf_counter() - t0)
+        return ctx
+
+    t_data = time.perf_counter()
     inf.extract_data(query, index_type, filter_value, explain_code, category)
+    trace.record("Set search index and category", time.perf_counter() - t_data)
+
+    # --- NAT input policy (before routing / SQL / retrieval) ---
+    if nat_input_policy_enabled():
+        t_pol = time.perf_counter()
+        ip_res, tok_ip = await run_nat_input_policy(
+            query, NAT_INPUT_POLICY_SYSTEM, agent_latency
+        )
+        trace.record("LLM: nat_input_policy", time.perf_counter() - t_pol)
+        total_tokens += tok_ip
+        _log_message(transcript, "nat_input_policy", ip_res.get("raw", ""))
+        allowed_in = ip_res.get("allowed", True)
+        _policy_append(
+            policy_nat_trace,
+            phase="nat_input_policy",
+            allowed=bool(allowed_in),
+            detail={"reason": ip_res.get("message") or ""},
+        )
+        if not allowed_in:
+            end_early = time.time()
+            msg = ip_res.get("message") or "Request blocked by input policy."
+            blocked = {
+                "final_answer": [
+                    {"text": msg, "type": "llm"},
+                    {"text": "", "type": "llm"},
+                ]
+            }
+            return {
+                "data_points": {},
+                "answer": blocked,
+                "thoughts": _thoughts_html_from_transcript(transcript),
+                "sql_query": "",
+                "token_usage": total_tokens,
+                "agent_latencies": {k: round(v, 3) for k, v in agent_latency.items()},
+                "latency_steps": trace.to_list(),
+                "orchestration_total_latency_sec": round(end_early - start, 3),
+                "policy_nat": {"input_blocked": True, "trace": policy_nat_trace},
+            }
 
     # --- Routing (replaces user_proxy -> routing_agent) ---
     routing_sys = routing_agent_prompt(schema_text)
     routing_user = f""""question": {query}"""
-    routing_content, tok = await chat_completion(
-        "routing_agent", routing_sys, routing_user, agent_latency
-    )
+    routing_content, tok = await _llm("routing_agent", routing_sys, routing_user)
     total_tokens += tok
     _log_message(transcript, "routing_agent", routing_content)
 
@@ -168,11 +287,10 @@ async def run_unified_nat_orchestration(
                 gen_user_parts.append(f"Revision feedback from Sql_Execution_Critic / Sql_Generator loop:\n{feedback_hint}")
             gen_user = "\n\n".join(gen_user_parts)
 
-            sg_content, tok = await chat_completion(
+            sg_content, tok = await _llm(
                 "Sql_Generator",
                 sql_generator_prompt(schema_text),
                 gen_user,
-                agent_latency,
             )
             total_tokens += tok
             _log_message(transcript, "Sql_Generator", sg_content)
@@ -186,9 +304,7 @@ async def run_unified_nat_orchestration(
                 f"Sql_Generator output:\n{sg_content}\n\n"
                 f"Validate and confirm execution path for SQL against the user question:\n{query}"
             )
-            se_content, tok = await chat_completion(
-                "Sql_Executor", SQL_EXECUTOR_PROMPT, se_user, agent_latency
-            )
+            se_content, tok = await _llm("Sql_Executor", SQL_EXECUTOR_PROMPT, se_user)
             total_tokens += tok
             _log_message(transcript, "Sql_Executor", se_content)
 
@@ -197,17 +313,17 @@ async def run_unified_nat_orchestration(
                 f"Sql_Executor output:\n{se_content}\n\n"
                 f"Extract sql_query from Sql_Generator JSON if present; executable query:\n{q}"
             )
-            st_content, tok = await chat_completion(
-                "Sql_tool", SQL_TOOL_PROMPT, st_user, agent_latency
-            )
+            st_content, tok = await _llm("Sql_tool", SQL_TOOL_PROMPT, st_user)
             total_tokens += tok
             active_query = q if isinstance(q, str) and q.strip() else None
             if active_query is None:
                 tool_out = "An error occurred while execusting the query: no sql_query from Sql_Generator"
             else:
+                t_sql = time.perf_counter()
                 tool_out = await asyncio.to_thread(
                     execute_sql_tool, active_query, connection_string
                 )
+                trace.record("SQL execute", time.perf_counter() - t_sql)
 
             last_sql_tool_output = tool_out
             _log_message(transcript, "Sql_tool", tool_out)
@@ -217,11 +333,10 @@ async def run_unified_nat_orchestration(
                 f"Sql_Generator:\n{sg_content}\n\n"
                 f"Sql_tool output:\n{tool_out}\n"
             )
-            critic_content, tok = await chat_completion(
+            critic_content, tok = await _llm(
                 "Sql_Execution_Critic",
                 sql_execution_critic_prompt(schema_text),
                 critic_user,
-                agent_latency,
             )
             total_tokens += tok
             _log_message(transcript, "Sql_Execution_Critic", critic_content)
@@ -260,11 +375,10 @@ async def run_unified_nat_orchestration(
             f"Sql_Generator:\n{sg_content}\n\n"
             f"Sql_tool output:\n{last_sql_tool_output}\n"
         )
-        insight_content, tok = await chat_completion(
+        insight_content, tok = await _llm(
             "Insight_Generator",
             INSIGHT_GENERATOR_PROMPT,
             insight_user,
-            agent_latency,
         )
         total_tokens += tok
         _log_message(transcript, "Insight_Generator", insight_content)
@@ -277,16 +391,14 @@ async def run_unified_nat_orchestration(
         sql_q: str,
         sql_ans: str,
     ) -> str:
-        nonlocal total_tokens, data_points
+        nonlocal total_tokens, data_points, policy_nat_trace
         sel_user = (
             f"{selector_extra}\n\n"
             f"Routing JSON:\n{json.dumps(routing_parsed, ensure_ascii=False)}\n\n"
             f"Carry forward:\n{json.dumps(selector_context, ensure_ascii=False)}\n\n"
             f"If updated_question_override is set, use it for retrieval:\n{updated_question_override or ''}"
         )
-        sel_content, tok = await chat_completion(
-            "Selector_agent", SELECTOR_AGENT_PROMPT, sel_user, agent_latency
-        )
+        sel_content, tok = await _llm("Selector_agent", SELECTOR_AGENT_PROMPT, sel_user)
         total_tokens += tok
         _log_message(transcript, "Selector_agent", sel_content)
 
@@ -298,9 +410,34 @@ async def run_unified_nat_orchestration(
             or query
         )
 
-        ctx = await inf.extract_context(question=q_ret)
+        ctx = await _extract_context_timed(q_ret)
         data_points = json.dumps(ctx)
         _log_message(transcript, "retriever", data_points)
+
+        snippets = ctx_to_grounding_snippets(ctx)
+        if nat_grounding_policy_enabled() and snippets.strip():
+            t_gp = time.perf_counter()
+            gp_res, tok_g = await run_nat_grounding_policy(
+                str(q_ret),
+                snippets,
+                NAT_GROUNDING_POLICY_SYSTEM,
+                agent_latency,
+            )
+            trace.record("LLM: nat_grounding_policy", time.perf_counter() - t_gp)
+            total_tokens += tok_g
+            _log_message(transcript, "nat_grounding_policy", gp_res.get("raw", ""))
+            g_ok = bool(gp_res.get("allowed", True))
+            _policy_append(
+                policy_nat_trace,
+                phase="nat_grounding_policy",
+                allowed=g_ok,
+                detail={"reason": gp_res.get("message") or ""},
+            )
+            if not g_ok:
+                return (
+                    gp_res.get("message")
+                    or "The retrieved information is not sufficient to answer this question reliably."
+                )
 
         lam_user = json.dumps(
             {"question": q_ret, "context": ctx, "analysis_type": analysis_type_out},
@@ -310,9 +447,7 @@ async def run_unified_nat_orchestration(
             {"role": "system", "content": LLM_ANSWER_MAKER_PROMPT},
             {"role": "user", "content": lam_user},
         ]
-        lam_content, tok = await chat_completion_raw_messages(
-            "llm_answer_maker", lam_messages, agent_latency
-        )
+        lam_content, tok = await _llm_messages("llm_answer_maker", lam_messages)
         total_tokens += tok
         _log_message(transcript, "llm_answer_maker", lam_content)
 
@@ -327,9 +462,7 @@ async def run_unified_nat_orchestration(
                 {"role": "system", "content": CRITIC_AGENT_PROMPT},
                 {"role": "user", "content": crit_user},
             ]
-            crit_content, tok = await chat_completion_raw_messages(
-                "critic_agent", crit_messages, agent_latency
-            )
+            crit_content, tok = await _llm_messages("critic_agent", crit_messages)
             total_tokens += tok
             _log_message(transcript, "critic_agent", crit_content)
 
@@ -345,15 +478,38 @@ async def run_unified_nat_orchestration(
                 f"Critic requested more context. feedback_query:\n{fq}\n\n"
                 f"Original selector payload:\n{sel_content}"
             )
-            sel_content2, tok = await chat_completion(
-                "Selector_agent", SELECTOR_AGENT_PROMPT, sel_user2, agent_latency
-            )
+            sel_content2, tok = await _llm("Selector_agent", SELECTOR_AGENT_PROMPT, sel_user2)
             total_tokens += tok
             _log_message(transcript, "Selector_agent", sel_content2)
 
-            ctx = await inf.extract_context(question=str(fq))
+            ctx = await _extract_context_timed(str(fq))
             data_points = json.dumps(ctx)
             _log_message(transcript, "retriever", data_points)
+
+            snippets2 = ctx_to_grounding_snippets(ctx)
+            if nat_grounding_policy_enabled() and snippets2.strip():
+                t_gp2 = time.perf_counter()
+                gp2, tok_g2 = await run_nat_grounding_policy(
+                    str(fq),
+                    snippets2,
+                    NAT_GROUNDING_POLICY_SYSTEM,
+                    agent_latency,
+                )
+                trace.record("LLM: nat_grounding_policy (retry)", time.perf_counter() - t_gp2)
+                total_tokens += tok_g2
+                _log_message(transcript, "nat_grounding_policy", gp2.get("raw", ""))
+                g2_ok = bool(gp2.get("allowed", True))
+                _policy_append(
+                    policy_nat_trace,
+                    phase="nat_grounding_policy",
+                    allowed=g2_ok,
+                    detail={"reason": gp2.get("message") or "", "retry": True},
+                )
+                if not g2_ok:
+                    return (
+                        gp2.get("message")
+                        or "The retrieved information is not sufficient to answer this question reliably."
+                    )
 
             lam_user2 = json.dumps(
                 {"question": fq, "context": ctx, "analysis_type": analysis_type_out},
@@ -363,9 +519,7 @@ async def run_unified_nat_orchestration(
                 {"role": "system", "content": LLM_ANSWER_MAKER_PROMPT},
                 {"role": "user", "content": lam_user2},
             ]
-            last_lam, tok = await chat_completion_raw_messages(
-                "llm_answer_maker", lam_messages2, agent_latency
-            )
+            last_lam, tok = await _llm_messages("llm_answer_maker", lam_messages2)
             total_tokens += tok
             _log_message(transcript, "llm_answer_maker", last_lam)
 
@@ -432,11 +586,10 @@ async def run_unified_nat_orchestration(
                     f"Insight_Generator output:\n{insight_content}\n\n"
                     f"Initial question:\n{query}\n"
                 )
-            qt_content, tok = await chat_completion(
+            qt_content, tok = await _llm(
                 "query_transformer",
                 QUERY_TRANSFORMER_PROMPT,
                 qt_user,
-                agent_latency,
             )
             total_tokens += tok
             _log_message(transcript, "query_transformer", qt_content)
@@ -491,10 +644,53 @@ async def run_unified_nat_orchestration(
         }
 
     # --- Format final answer (same helper as legacy stack) ---
+    t_fmt = time.perf_counter()
     formated_answer = await asyncio.to_thread(inf.formating_final_answer, final_answer)
-    formated_final_answer = json.loads(
-        formated_answer.replace("```json", "").replace("```", "").strip()
-    )
+    trace.record("LLM: format_final_answer", time.perf_counter() - t_fmt)
+    formated_final_answer = inf.parse_formatted_final_answer(formated_answer, final_answer)
+
+    if nat_output_policy_enabled():
+        plain_out = _plain_text_from_formatted_answer(formated_final_answer)
+        if plain_out:
+            t_op = time.perf_counter()
+            op_res, tok_o = await run_nat_output_policy(
+                query,
+                plain_out,
+                NAT_OUTPUT_POLICY_SYSTEM,
+                agent_latency,
+            )
+            trace.record("LLM: nat_output_policy", time.perf_counter() - t_op)
+            total_tokens += tok_o
+            _log_message(transcript, "nat_output_policy", op_res.get("raw", ""))
+            op_ok = bool(op_res.get("allowed", True))
+            _policy_append(
+                policy_nat_trace,
+                phase="nat_output_policy",
+                allowed=op_ok,
+                detail={
+                    "redacted": bool(
+                        op_ok
+                        and op_res.get("text")
+                        and op_res["text"] != plain_out
+                    ),
+                },
+            )
+            if not op_ok:
+                formated_final_answer = {
+                    "final_answer": [
+                        {
+                            "text": op_res.get("text")
+                            or op_res.get("message")
+                            or "This response was blocked by output policy.",
+                            "type": "llm",
+                        },
+                        {"text": "", "type": "llm"},
+                    ]
+                }
+            elif op_res.get("text") and op_res["text"] != plain_out:
+                formated_final_answer = {
+                    "final_answer": [{"text": op_res["text"], "type": "llm"}]
+                }
 
     try:
         if isinstance(data_points, str) and data_points.strip():
@@ -507,18 +703,17 @@ async def run_unified_nat_orchestration(
         print("Warning: unable to parse data_points:", e)
         parsed_data_points = {}
 
-    thoughts_list = []
-    for msg in transcript:
-        name = msg.get("name")
-        content = msg.get("content")
-        role = msg.get("role")
-        thoughts_list.append(
-            '<div style="border: 1px solid #ccc; padding: 20px; border-radius: 5px; width: fit-content;">'
-            f"<h2>{name}</h2><br /><h4>Role: {role}</h4><br />{content}</div>"
-        )
-    thoughts = "\n <br/> <br />".join(thoughts_list)
+    thoughts = _thoughts_html_from_transcript(transcript)
+
+    generated_plot = None
+    if python_code:
+        t_plot = time.perf_counter()
+        generated_plot = await asyncio.to_thread(inf.plot_to_base64, python_code)
+        trace.record("Plot generation", time.perf_counter() - t_plot)
 
     end = time.time()
+    orch_total = round(end - start, 3)
+    trace.append_gap_if_needed(orch_total)
 
     response: dict[str, Any] = {
         "data_points": parsed_data_points,
@@ -527,12 +722,13 @@ async def run_unified_nat_orchestration(
         "sql_query": sql_query,
         "token_usage": total_tokens,
         "agent_latencies": {k: round(v, 3) for k, v in agent_latency.items()},
-        "orchestration_total_latency_sec": round(end - start, 3),
+        "latency_steps": trace.to_list(),
+        "orchestration_total_latency_sec": orch_total,
+        "policy_nat": {"trace": policy_nat_trace},
     }
 
     if python_code:
         response["python_code"] = python_code
-        generated_plot = await asyncio.to_thread(inf.plot_to_base64, python_code)
         if generated_plot:
             response["plot_base64"] = "data:image/png;base64," + generated_plot
         else:

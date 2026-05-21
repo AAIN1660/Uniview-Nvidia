@@ -19,12 +19,10 @@ embed_graph:
 embeddings:
   async_mode: threaded
   llm:
-    api_base: ${OPENAI_API_BASE}
-    api_key: ${OPENAI_API_KEY}
-    api_version: 2024-02-15-preview
-    deployment_name: text-embedding-3-small
-    model: text-embedding-3-small
-    type: azure_openai_embedding
+    api_base: ${NVIDIA_EMBEDDING_BASE_URL}
+    api_key: ${NVIDIA_API_KEY}
+    model: ${NVIDIA_EMBEDDING_MODEL}
+    type: openai_embedding
 encoding_model: cl100k_base
 entity_extraction:
   entity_types:
@@ -44,9 +42,9 @@ input:
   file_type: text
   type: blob
 llm:
-  api_base: ${OPENAI_API_BASE}
-  api_key: ${OPENAI_API_KEY}
-  api_version: 2024-02-15-preview
+  api_base: ${GRAPH_RAG_OPENAI_API_BASE}
+  api_key: ${GRAPH_RAG_OPENAI_API_KEY}
+  api_version: ${GRAPH_RAG_OPENAI_API_VERSION}
   deployment_name: gpt-4o
   max_tokens: 4096
   model: gpt-4o
@@ -56,7 +54,7 @@ local_search: null
 parallelization:
   stagger: 0.3
 reporting:
-  base_dir: graphragoutput/389ff72d-3880-40a7-9599-b8139ff6d8e2/reports
+  base_dir: graphragoutput/b7ec5651-e2b5-4343-8f83-e691d012104c/reports
   connection_string: ${BLOB_STORAGE_CONNECTION_STRING}
   container_name: ${BLOB_STORAGE_CONTAINER_NAME}
   type: blob
@@ -66,7 +64,7 @@ snapshots:
   raw_entities: false
   top_level_nodes: false
 storage:
-  base_dir: graphragoutput/389ff72d-3880-40a7-9599-b8139ff6d8e2/artifacts
+  base_dir: graphragoutput/b7ec5651-e2b5-4343-8f83-e691d012104c/artifacts
   connection_string: ${BLOB_STORAGE_CONNECTION_STRING}
   container_name: ${BLOB_STORAGE_CONTAINER_NAME}
   type: blob

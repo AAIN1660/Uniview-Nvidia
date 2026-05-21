@@ -11,6 +11,7 @@ import urllib
 import os
 import pypyodbc as odbc
 import json
+from typing import Any
 from dotenv import load_dotenv
 from azure.core.credentials import AzureKeyCredential  
 from openai import AzureOpenAI
@@ -35,7 +36,6 @@ from graphrag.query.indexer_adapters import (
 )
 from graphrag.query.input.loaders.dfs import store_entity_semantic_embeddings
 from graphrag.query.llm.oai.chat_openai import ChatOpenAI
-from graphrag.query.llm.oai.embedding import OpenAIEmbedding
 from graphrag.query.llm.oai.typing import OpenaiApiType
 from graphrag.query.structured_search.local_search.mixed_context import LocalSearchMixedContext
 from graphrag.query.structured_search.local_search.search import LocalSearch
@@ -47,6 +47,13 @@ import ast
 import matplotlib.pyplot as plt
 import seaborn as sns
 import base64
+from utility.graphrag_artifacts import (
+    expected_graph_embedding_dim,
+    graph_lancedb_uri,
+    resolve_graph_artifacts_folder,
+    validate_entity_embedding_dims,
+)
+from utility.graphrag_text_embedder import create_graphrag_text_embedder, graphrag_embeddings_use_nim
 from utility.helper import (
     formating_final_answer,
     get_sql_engine,
@@ -76,11 +83,9 @@ AZURE_OPENAI_API_BASE = os.getenv("AZURE_OPENAI_API_BASE")
 AZURE_OPENAI_API_KEY = os.getenv("AZURE_OPENAI_API_KEY")
 AZURE_SEARCH_INDEX_NAME = os.getenv("AZURE_SEARCH_INDEX_NAME")
 
-GRAPH_RAG_EMBEDDING_MODEL_NAME=os.getenv("GRAPH_RAG_EMBEDDING_MODEL_NAME")
-GRAPH_RAG_OPENAI_API_TYPE=os.getenv("GRAPH_RAG_OPENAI_API_TYPE")
-GRAPH_RAG_OPENAI_API_BASE=os.getenv("GRAPH_RAG_OPENAI_API_BASE")
-GRAPH_RAG_OPENAI_API_VERSION=os.getenv("GRAPH_RAG_OPENAI_API_VERSION")
-GRAPH_RAG_OPENAI_API_KEY=os.getenv("GRAPH_RAG_OPENAI_API_KEY")
+GRAPH_RAG_OPENAI_API_BASE = os.getenv("GRAPH_RAG_OPENAI_API_BASE")
+GRAPH_RAG_OPENAI_API_VERSION = os.getenv("GRAPH_RAG_OPENAI_API_VERSION")
+GRAPH_RAG_OPENAI_API_KEY = os.getenv("GRAPH_RAG_OPENAI_API_KEY")
 
 azure_search_credential = AzureKeyCredential(AZURE_SEARCH_ADMIN_KEY)
 
@@ -305,9 +310,9 @@ search_client = SearchClient(endpoint=AZURE_SEARCH_SERVICE_ENDPOINT,index_name=A
                              )
 
 llm = ChatOpenAI(
-    api_key=GRAPH_RAG_OPENAI_API_KEY,
-    api_base=GRAPH_RAG_OPENAI_API_BASE,
-    api_version=GRAPH_RAG_OPENAI_API_VERSION,
+    api_key=_clean_env(GRAPH_RAG_OPENAI_API_KEY or AZURE_OPENAI_API_KEY),
+    api_base=_clean_env(GRAPH_RAG_OPENAI_API_BASE or AZURE_OPENAI_API_BASE),
+    api_version=_clean_env(GRAPH_RAG_OPENAI_API_VERSION or AZURE_OPENAI_API_VERSION),
     deployment_name="gpt-4o",
     model=GPT3_LLM_MODEL_NAME,
     api_type=OpenaiApiType.AzureOpenAI,
@@ -315,19 +320,6 @@ llm = ChatOpenAI(
 )
 
 token_encoder = tiktoken.get_encoding("cl100k_base")
-
-class _NvidiaOpenAIEmbedding(OpenAIEmbedding):
-    """Thin wrapper that injects input_type required by NVIDIA asymmetric models."""
-
-    def _embed_with_retry(self, text, **kwargs):
-        kwargs.setdefault("extra_body", {})
-        kwargs["extra_body"].setdefault("input_type", "query")
-        return super()._embed_with_retry(text, **kwargs)
-
-    async def _aembed_with_retry(self, text, **kwargs):
-        kwargs.setdefault("extra_body", {})
-        kwargs["extra_body"].setdefault("input_type", "query")
-        return await super()._aembed_with_retry(text, **kwargs)
 
 
 def _clean_env_val(v):
@@ -338,35 +330,16 @@ def _clean_env_val(v):
 
 
 # -----------------------------------------------------------------------------
-# GraphRAG entity embedder
+# GraphRAG entity embedder (query-time)
 # -----------------------------------------------------------------------------
-# IMPORTANT: This embedder is consumed by graphrag.query.*  to compare a user
-# question against the **entity vectors stored in the LanceDB parquet artifacts**
-# (graphragoutput/<run-id>/artifacts/create_final_entities.parquet, etc.).
-#
-# Those entity vectors were generated **at GraphRAG indexing time** by Azure
-# OpenAI ``text-embedding-3-small`` (1536-dim).  Once written they're immutable
-# — you can't change them without re-running the full GraphRAG pipeline.
-#
-# Therefore the query-time embedder for GraphRAG **must always be Azure
-# text-embedding-3-small (1536-dim)**, regardless of EMBEDDING_BACKEND.  If we
-# let it follow EMBEDDING_BACKEND=nvidia we'd produce 1024-dim query vectors and
-# LanceDB would reject them with:
-#   ValueError: Query vector size 1024 does not match index column size 1536
-#
-# The OTHER embedder (NVIDIA NIM nv-embedqa-e5-v5, 1024-dim) is used for
-# **Milvus/Zilliz** retrieval via ``generate_embeddings()`` below.  That's
-# independent and switched by EMBEDDING_BACKEND.
+# Must match the model and vector dimension used when the GraphRAG index was
+# built (see ``data/settings.yaml`` embeddings + ``graphrag_index_runner.py``).
+# Default: NIM ``NVIDIA_EMBEDDING_MODEL`` when ``EMBEDDING_BACKEND=nvidia`` (or
+# ``GRAPH_RAG_EMBEDDING_BACKEND=nvidia``). Azure path remains for legacy indices
+# (set ``GRAPH_RAG_EMBEDDING_BACKEND=azure``). After switching embedding
+# provider, re-run the full GraphRAG indexer.
 # -----------------------------------------------------------------------------
-text_embedder = OpenAIEmbedding(
-    api_key=GRAPH_RAG_OPENAI_API_KEY,
-    api_base=GRAPH_RAG_OPENAI_API_BASE,
-    api_version=GRAPH_RAG_OPENAI_API_VERSION,
-    api_type=OpenaiApiType.AzureOpenAI,
-    model=GRAPH_RAG_EMBEDDING_MODEL_NAME,
-    deployment_name=GRAPH_RAG_EMBEDDING_MODEL_NAME,
-    max_retries=20,
-)
+text_embedder = create_graphrag_text_embedder()
 
 
 # Localsearch_engine = LocalSearch(
@@ -452,7 +425,19 @@ def _build_graph_context_builder(container_name: str, folder_path: str) -> Local
     TEXT_UNIT_TABLE = "create_final_text_units"
     COMMUNITY_LEVEL = 3
 
-    LANCEDB_URI = os.path.join(os.getcwd(), 'graphragoutput')
+    LANCEDB_URI = graph_lancedb_uri(folder_path)
+    rebuild = _clean_env_val(os.getenv("GRAPH_RAG_REBUILD_LANCE")).lower() in ("1", "true", "yes")
+    if rebuild and os.path.isdir(LANCEDB_URI):
+        shutil.rmtree(LANCEDB_URI, ignore_errors=True)
+    os.makedirs(LANCEDB_URI, exist_ok=True)
+
+    expected_dim = expected_graph_embedding_dim()
+    print(
+        f"[GraphRAG] loading artifacts from blob:{folder_path} | "
+        f"lancedb:{LANCEDB_URI} | embed_backend={'nvidia' if graphrag_embeddings_use_nim() else 'azure'} | "
+        f"expected_dim={expected_dim}",
+        flush=True,
+    )
 
     def _read(table: str) -> pd.DataFrame:
         data = _download_blob_bytes(
@@ -468,6 +453,7 @@ def _build_graph_context_builder(container_name: str, folder_path: str) -> Local
 
     relationships = read_indexer_relationships(relationship_df)
     entities = read_indexer_entities(entity_df, entity_embedding_df, COMMUNITY_LEVEL)
+    validate_entity_embedding_dims(entities, expected_dim, folder_path)
 
     description_embedding_store = LanceDBVectorStore(collection_name="entity_description_embeddings")
     description_embedding_store.connect(db_uri=LANCEDB_URI)
@@ -523,15 +509,36 @@ def invalidate_graph_context_cache(container_name: str | None = None, folder_pat
             _GRAPH_CONTEXT_CACHE.pop((container_name, folder_path), None)
 
 
+_last_extract_context_latencies: dict[str, float | str] = {}
+
+
+def pop_extract_context_latencies() -> dict[str, float | str]:
+    """Sub-step timings from the most recent ``extract_context`` call (for latency tables)."""
+    global _last_extract_context_latencies
+    out: dict[str, float | str] = {}
+    for k, v in _last_extract_context_latencies.items():
+        if isinstance(v, (int, float)):
+            out[k] = round(float(v), 3)
+        else:
+            out[k] = v
+    _last_extract_context_latencies = {}
+    return out
+
+
 async def extract_context(question: str = None, vector_weight: float = 0.5, graph_weight: float = 0.5) -> dict:
+    global _last_extract_context_latencies
+    _last_extract_context_latencies = {}
+    t_extract_start = time.perf_counter()
+
     selector = search_type
     # selector = 'hybrid'
     print('************************************** selector ******************************', selector)
     if not question:
         print("No question provided")
         return {}
- 
+
     async def fetch_vector_context():
+        t_vec = time.perf_counter()
         # ------------------------------------------------------------------
         # Unified retrieval path (Azure AI Search OR Milvus/Zilliz):
         #   1. Embed the question  (NVIDIA NIM nv-embedqa-e5-v5)
@@ -548,7 +555,11 @@ async def extract_context(question: str = None, vector_weight: float = 0.5, grap
             if embedding_backend() == "nvidia"
             else os.getenv("AZURE_OPENAI_EMBEDDING_DEPLOYED_MODEL")
         )
+        t_embed = time.perf_counter()
         vector = generate_embeddings(question, client, model)
+        _last_extract_context_latencies["retrieval:vector_embed_sec"] = round(
+            time.perf_counter() - t_embed, 3
+        )
 
         # Oversample for reranker. ZILLIZ_VECTOR_TOP_K kept as legacy override.
         retrieve_top_k_raw = (
@@ -569,6 +580,7 @@ async def extract_context(question: str = None, vector_weight: float = 0.5, grap
             rerank_top_n = 3
 
         # ---- Retrieval (backend split) -----------------------------------
+        t_search = time.perf_counter()
         chunks: list[dict] = []  # list of {"content","sourcepage"} for reranker
         if _vector_search_backend() == "zilliz":
             from utility import zilliz_client as _zilliz_client
@@ -600,8 +612,12 @@ async def extract_context(question: str = None, vector_weight: float = 0.5, grap
                 chunks.append(
                     {"sourcepage": r["sourcepage"], "content": r["content"]}
                 )
+        _last_extract_context_latencies["retrieval:vector_search_sec"] = round(
+            time.perf_counter() - t_search, 3
+        )
 
         # ---- NIM reranker (NVIDIA llama-nemotron-rerank-1b-v2) -----------
+        t_rerank = time.perf_counter()
         # Honors ENABLE_RERANKER toggle and RERANKER_TOP_N in unified.env.
         # On any reranker failure, returns the original order trimmed to top_n.
         _bar = "=" * 72
@@ -637,6 +653,12 @@ async def extract_context(question: str = None, vector_weight: float = 0.5, grap
                 flush=True,
             )
             final_chunks = chunks[:rerank_top_n]
+        _last_extract_context_latencies["retrieval:rerank_sec"] = round(
+            time.perf_counter() - t_rerank, 3
+        )
+        _last_extract_context_latencies["retrieval:vector_total_sec"] = round(
+            time.perf_counter() - t_vec, 3
+        )
 
         result_list = {"chunks": [], "sources": []}
         for c in final_chunks:
@@ -647,51 +669,94 @@ async def extract_context(question: str = None, vector_weight: float = 0.5, grap
         return result_list
     
     async def fetch_graph_context():
-        # GraphRAG artifact path. Kept stable so the cache key
-        # ``(container, folder)`` stays warm across requests.
-        print('########################## graphrag_category #############################', graphrag_category)
-        BLOB_FOLDER_PATH = "graphragoutput/b7a91d7b-f174-43c2-a5ef-e4af152768a7/artifacts"
-        print('*************** BLOB_FOLDER_PATH ***************', BLOB_FOLDER_PATH)
+        t_graph = time.perf_counter()
+        # GraphRAG artifacts live under blob path ``graphragoutput/<category_id>/artifacts``.
+        # Must match the category used at index time (same LanceDB vector dim as indexer).
+        # Optional full override: GRAPH_RAG_ARTIFACTS_FOLDER=graphragoutput/<uuid>/artifacts
+        print(
+            "########################## graphrag_category #############################",
+            graphrag_category,
+        )
+        BLOB_FOLDER_PATH = resolve_graph_artifacts_folder(graphrag_category)
+        print("*************** BLOB_FOLDER_PATH ***************", BLOB_FOLDER_PATH)
 
         # First call: downloads 5 parquet files, connects LanceDB,
         # stores entity embeddings, builds ``LocalSearchMixedContext``.
         # Subsequent calls: instant cache hit, only ``build_context``
         # below runs per question.
+        t_boot = time.perf_counter()
         Localcontext_builder = await asyncio.to_thread(
             _get_graph_context_builder, BLOB_CONTAINER_NAME, BLOB_FOLDER_PATH
         )
-
-        context = await asyncio.to_thread(
-            Localcontext_builder.build_context,
-            question,
-            top_k_mapped_entities=2,
-            top_k_relationships=2,
-            max_tokens=12_000,
+        _last_extract_context_latencies["retrieval:graph_bootstrap_sec"] = round(
+            time.perf_counter() - t_boot, 3
         )
+
+        try:
+            t_build = time.perf_counter()
+            context = await asyncio.to_thread(
+                Localcontext_builder.build_context,
+                question,
+                top_k_mapped_entities=2,
+                top_k_relationships=2,
+                max_tokens=12_000,
+            )
+            _last_extract_context_latencies["retrieval:graph_build_context_sec"] = round(
+                time.perf_counter() - t_build, 3
+            )
+        except ValueError as ve:
+            msg = str(ve).lower()
+            if "vector size" in msg and "does not match" in msg:
+                print(
+                    "\n[GraphRAG] Embedding dimension mismatch (query vs LanceDB index).\n"
+                    "  Query embeddings use EMBEDDING_BACKEND / NVIDIA_EMBEDDING_MODEL "
+                    "(e.g. nvidia/nv-embedqa-e5-v5 -> 1024 dims).\n"
+                    "  This artifact folder was built with a different embedding width "
+                    "(often 1536 for older Azure text-embedding-3-small indices).\n"
+                    "  Fix: re-run GraphRAG indexing with ``python graphrag_index_runner.py`` "
+                    "and data/settings.yaml NIM embeddings, then publish to this blob path; "
+                    "or set GRAPH_RAG_EMBEDDING_BACKEND=azure only for legacy 1536-dim folders.\n"
+                    f"  BLOB_FOLDER_PATH={BLOB_FOLDER_PATH}\n"
+                    f"  Original error: {ve}\n",
+                    flush=True,
+                )
+            raise
         print("graph_context :::::", context)
+        _last_extract_context_latencies["retrieval:graph_total_sec"] = round(
+            time.perf_counter() - t_graph, 3
+        )
         return context
-    
+
     # Fetch contexts based on selector
+    result: dict = {}
     if selector == "vector":
         vector_context = await fetch_vector_context()
-        return {"vector_context": vector_context}
- 
+        result = {"vector_context": vector_context}
+
     elif selector == "graph":
         graph_context = await fetch_graph_context()
-        return {"graph_context": {"chunks": [str(graph_context)]}}
- 
+        result = {"graph_context": {"chunks": [str(graph_context)]}}
+
     elif selector == "hybrid":
-        vector_context, graph_context = await asyncio.gather(fetch_vector_context(), fetch_graph_context())
-        return {
+        vector_context, graph_context = await asyncio.gather(
+            fetch_vector_context(), fetch_graph_context()
+        )
+        result = {
             "vector_context": vector_context,
             "graph_context": {"chunks": [str(graph_context)]},
             "vector_weight": vector_weight,
-            "graph_weight": graph_weight
+            "graph_weight": graph_weight,
         }
- 
+
     else:
         print("Invalid selector provided")
         return {}
+
+    _last_extract_context_latencies["retrieval:extract_context_total_sec"] = round(
+        time.perf_counter() - t_extract_start, 3
+    )
+    _last_extract_context_latencies["retrieval:search_mode"] = selector or "unknown"
+    return result
     
 
  
@@ -828,6 +893,47 @@ def parse_agent_content_json(content):
     print("parse_agent_content_json: could not parse JSON from agent message (preview):", s[:400])
     return {}
 
+
+def parse_formatted_final_answer(llm_output: str, source_context: Any = None) -> dict[str, Any]:
+    """
+    Parse ``formating_final_answer`` LLM output into ``{"final_answer": [{type, text}, ...]}``.
+
+    The formatter model often embeds user text with unescaped quotes, which breaks
+    ``json.loads``. Fall back to the pre-format ``source_context`` (sql_answer / llm_answer).
+    """
+    parsed = parse_agent_content_json(llm_output)
+    if isinstance(parsed, dict):
+        fa = parsed.get("final_answer")
+        if isinstance(fa, list) and fa:
+            return parsed
+
+    sql_t = ""
+    llm_t = ""
+    if isinstance(source_context, dict):
+        sql_t = str(source_context.get("sql_answer") or "").strip()
+        llm_t = str(source_context.get("llm_answer") or "").strip()
+
+    parts: list[dict[str, str]] = []
+    if sql_t:
+        parts.append({"type": "sql", "text": sql_t})
+    if llm_t:
+        parts.append({"type": "llm", "text": llm_t})
+
+    if not parts:
+        raw = str(llm_output or "").strip()
+        if raw:
+            parts.append({"type": "llm", "text": raw})
+
+    if parts:
+        print(
+            "[format_final_answer] JSON parse fallback: using source_context / raw text",
+            flush=True,
+        )
+        return {"final_answer": parts}
+
+    return {"final_answer": [{"type": "llm", "text": ""}]}
+
+
 def build_generic_sql_fallback_answer(messages):
     """
     Generic fallback for SQL / Both-dependent flows.
@@ -962,9 +1068,18 @@ async def start_agenting_process(query, index_type, filter, explain_code, catego
     if not query:
         return {}
 
-    category = '0d49bd7c-6004-4664-bb79-3c1dc342a5b7'
+    from utility.latency_trace import LatencyTrace
+    from utility.unified_nat_orchestrator import run_unified_nat_orchestration
 
+    workflow_start = time.time()
+    prep = LatencyTrace()
+
+    if not category:
+        category = _clean_env_val(os.getenv("GRAPH_RAG_DEFAULT_CATEGORY_ID")) or None
+
+    t0 = time.perf_counter()
     user_seleted_tables = get_tables_list_by_email(email)
+    prep.record("Load user SQL table list", time.perf_counter() - t0)
 
     print('&&&&&&&&&&&&&&&&&&&&&&&&&&&&&& all_table_schemas &&&&&&&&&&&&&&&&&&&&&&&&&&&&&&', user_seleted_tables)
 
@@ -974,22 +1089,29 @@ async def start_agenting_process(query, index_type, filter, explain_code, catego
         selected_tables = user_seleted_tables.get('tables_list') or []
 
     if not selected_tables:
+        t_list = time.perf_counter()
         if current_engine is not None:
             selected_tables = inspect(current_engine).get_table_names(schema=category_name)
             if not selected_tables:
                 selected_tables = inspect(current_engine).get_table_names()
+        prep.record("List tables from SQL engine", time.perf_counter() - t_list)
 
+    t_schema = time.perf_counter()
     all_table_schemas = get_sql_table_schema(connection_string, selected_tables)
+    prep.record("Load SQL table schemas", time.perf_counter() - t_schema)
 
     if (
         not all_table_schemas
         or (isinstance(all_table_schemas, dict) and len(all_table_schemas) == 0)
         or (isinstance(all_table_schemas, str) and all_table_schemas.lower().startswith('error'))
     ):
+        t_fb = time.perf_counter()
         if current_engine is not None:
             all_table_schemas = get_schema_tables(current_engine, category_name)
+        prep.record("SQL schema fallback (category tables)", time.perf_counter() - t_fb)
 
     if not all_table_schemas:
+        t_cross = time.perf_counter()
         try:
             if current_engine is None:
                 raise RuntimeError('SQL engine unavailable')
@@ -1011,12 +1133,11 @@ async def start_agenting_process(query, index_type, filter, explain_code, catego
                 all_table_schemas = all_schema_dict
         except Exception as schema_exc:
             print('Cross-schema introspection fallback failed:', schema_exc)
+        prep.record("SQL cross-schema introspection", time.perf_counter() - t_cross)
 
     print('&&&&&&&&&&&&&&&&&&&&&&&&&&&&&& all_table_schemas &&&&&&&&&&&&&&&&&&&&&&&&&&&&&&', all_table_schemas)
 
     print('^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ index_type ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^', index_type)
-
-    from utility.unified_nat_orchestrator import run_unified_nat_orchestration
 
     return await run_unified_nat_orchestration(
         query=query,
@@ -1027,4 +1148,6 @@ async def start_agenting_process(query, index_type, filter, explain_code, catego
         email=email,
         all_table_schemas=all_table_schemas,
         connection_string=connection_string,
+        prep_steps=prep.to_list(),
+        workflow_start=workflow_start,
     )

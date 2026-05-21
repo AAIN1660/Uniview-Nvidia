@@ -5,7 +5,7 @@ from azure.cosmos import exceptions, PartitionKey
 from azure.storage.blob import BlobServiceClient, PublicAccess
 from dotenv import load_dotenv
 from utility.helper import *
-from azure.core.exceptions import ResourceExistsError
+from azure.core.exceptions import HttpResponseError, ResourceExistsError
 from azure.core.credentials import AzureKeyCredential
 from azure.search.documents import SearchClient
 from azure.storage.queue import QueueServiceClient
@@ -73,6 +73,28 @@ def _create_container_compat(database, container_id: str):
 		msg = str(exc).lower()
 		if "serverless" in msg and "throughput" in msg:
 			return database.create_container_if_not_exists(**base_kwargs)
+		raise
+
+
+def _safe_create_or_update_search_index(
+	index_client: SearchIndexClient,
+	index: SearchIndex,
+	*,
+	label: str,
+) -> None:
+	"""Create or update index; skip when Azure rejects in-place vector dimension changes."""
+	try:
+		index_client.create_or_update_index(index)
+		print(f"---------- {label} created/updated ------------------")
+	except HttpResponseError as exc:
+		msg = str(exc)
+		if "CannotChangeExistingField" in msg or "contentVector" in msg:
+			print(
+				f"----- {label}: skipped (index already exists; contentVector cannot be changed). "
+				f"VECTOR_SEARCH_DIMENSIONS must match the deployed index, or delete/recreate the index. -----"
+			)
+			return
+		print(f"----- {label}: create_or_update_index failed: {exc} -----")
 		raise
 
 
@@ -179,8 +201,7 @@ async def create_service():
 
 	# Create the search index with the semantic settings
 	index = SearchIndex(name=AZURE_SEARCH_INDEX, fields=fields,vector_search=vector_search, semantic_search=semantic_settings)
-	index_client.create_or_update_index(index)
-	print('---------- Search Index Created------------------')
+	_safe_create_or_update_search_index(index_client, index, label="Search Index")
  
 	#-------- QNA INDEX-----------
 	qa_index_client = SearchIndexClient(endpoint=AZURE_SEARCH_SERVICE_ENDPOINT, credential=azure_search_credential)
@@ -210,10 +231,7 @@ async def create_service():
 	qa_semantic_settings = SemanticSearch(configurations=[qa_semantic_config])
 
 	qa_index = SearchIndex(name=AZURE_QNA_INDEX, fields=qa_fields,vector_search=vector_search, semantic_search=qa_semantic_settings)
-	qa_index_client.create_or_update_index(qa_index)
-
-
-	print('---------- QNA Index Created------------------')
+	_safe_create_or_update_search_index(qa_index_client, qa_index, label="QNA Index")
 
 
 	# Azure Storage Queue setup

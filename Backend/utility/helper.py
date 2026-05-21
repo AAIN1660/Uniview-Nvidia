@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from fastapi import FastAPI, HTTPException
 import logging
 import os
@@ -18,6 +20,7 @@ from sqlalchemy import create_engine, inspect
 from sqlalchemy.engine import Engine
 import urllib
 import yaml
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -25,8 +28,7 @@ import json
 from azure.storage.queue import QueueClient
 from tenacity import retry, wait_random_exponential, stop_after_attempt
 import PyPDF2
-import openai
-from openai import AzureOpenAI
+from utility.nim_chat_client import chat_completion_sync
 
 load_dotenv("unified.env")
 
@@ -107,13 +109,6 @@ container_client = blob_service_client.get_container_client(container_name)
 
 QUEUE_NAME = os.getenv("AZURE_QUEUE_STORAGE_NAME")
 QUEUE_CLIENT = QueueClient.from_connection_string(storage_connection_string, QUEUE_NAME)
-
-
-openai_client = AzureOpenAI(
-    api_key= os.getenv("AZURE_OPENAI_API_KEY"),
-    api_version=os.getenv("AZURE_OPENAI_API_VERSION"),
-    azure_endpoint=os.getenv("AZURE_OPENAI_API_BASE")
-)
 
 
 async def insert_qa_records(
@@ -633,8 +628,12 @@ async def run_graphrag_index(file_name, data_dir: str, category_id, graph_rag_fi
         )
 
     try:
+        backend_root = Path(__file__).resolve().parent.parent
+        runner = backend_root / "graphrag_index_runner.py"
         subprocess.run(
-            [sys.executable, "-m", "graphrag.index", "--root", data_dir], check=True
+            [sys.executable, str(runner), "--root", data_dir],
+            check=True,
+            cwd=str(backend_root),
         )
 
         for file_info in graph_rag_files:
@@ -680,6 +679,22 @@ async def run_graphrag_index(file_name, data_dir: str, category_id, graph_rag_fi
 
         print("$$$$$ GRAPH RAG INDEXING COMPLETED $$$$$$")
         logging.info("End of the Graph Rag indexing function.")
+
+        try:
+            from utility.graphrag_artifacts import graph_lancedb_uri
+            from utility.inference import invalidate_graph_context_cache
+
+            folder = f"graphragoutput/{category_id}/artifacts"
+            container = os.getenv("BLOB_STORAGE_CONTAINER_NAME")
+            if container:
+                invalidate_graph_context_cache(container, folder)
+            lance_path = graph_lancedb_uri(folder)
+            if os.path.isdir(lance_path):
+                shutil.rmtree(lance_path, ignore_errors=True)
+                print(f"[GraphRAG] cleared local LanceDB cache: {lance_path}")
+        except Exception as cache_exc:
+            logging.warning("GraphRAG post-index cache clear skipped: %s", cache_exc)
+
         return {"status": "success", "message": "Graph Indexing completed"}
 
     except subprocess.CalledProcessError as e:
@@ -884,18 +899,13 @@ def formating_final_answer(context):
     """
     prompt = template.format(context=context)
     print('###### prompt ###########', prompt)
-    response = openai_client.chat.completions.create(
-    model = os.getenv('GPT3_LLM_MODEL_DEPLOYMENT_NAME'),
-    messages =[
-    {"role": "system", "content": "You are a helpful assistant."},
-    {"role": "user", "content": f"{prompt}"}
-    ],
-    max_tokens=1024,
-    n=1,
-    temperature=0,
+    answer = chat_completion_sync(
+        system="You are a helpful assistant.",
+        user=prompt,
+        temperature=0.0,
+        max_tokens=1024,
     )
-    print('***************** llm call happened for format_answer ********************')
-    answer = response.choices[0].message.content
+    print('***************** NIM llm call (format_answer) ********************')
     # print("chunk_ids :", chunk_ids)
     # print(f"Question: {query}\n")
     # print(f"Answer: {answer}\n")

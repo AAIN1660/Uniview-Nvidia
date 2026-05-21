@@ -48,27 +48,28 @@ k = int(similar_chunk_count)
 
 EMBEDDING_MODEL_DEPLOYMENT_NAME = os.getenv("AZURE_OPENAI_EMBEDDING_DEPLOYED_MODEL")
 
+# ---------------------------------------------------------------------------
+# Containers: ALWAYS use utility.helper metadata DB (Mongo when
+# METADATA_BACKEND=mongo, else Cosmos via same Cosmos-API façade).
+#
+# Previously this module created its own CosmosClient; that split credits
+# (Cosmos) from helper.tran_container (Mongo) and broke balance checks.
+# ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# Containers: same DB as utility.helper (Mongo when METADATA_BACKEND=mongo).
+# ---------------------------------------------------------------------------
+from utility.helper import (
+    config_container,
+    tran_container as transaction_container,
+    upload_container,
+    user_container,
+)
 
-COSMOS_DATABASE_NAME = _clean_env(os.getenv("COSMOS_DATABASE_NAME"))
-COSMOS_ENDPOINT = _clean_env(os.getenv("COSMOS_ENDPOINT"))
-COSMOS_KEY = _clean_env(os.getenv("COSMOS_KEY"))
 
+def calculate_balance_sync(email: str) -> float:
+    from utility.helper import calculate_balance as _h_balance
 
-
-client = CosmosClient(url=COSMOS_ENDPOINT, credential=COSMOS_KEY)
-database = client.get_database_client(COSMOS_DATABASE_NAME)
-
-# Define container names from env (with sane defaults)
-user_container_name = _clean_env(os.getenv("USER_CONTAINER_NAME"), "gi_users")
-transaction_container_name = _clean_env(os.getenv("TRANSACTION_CONTAINER_NAME"), "transactions")
-config_container_name = _clean_env(os.getenv("CONFIG_CONTAINER_NAME"), "config")
-upload_container_name = _clean_env(os.getenv("UPLOAD_CONTAINER_NAME"), "gi_uploads")
-
-# Define your containers
-user_container = database.get_container_client(user_container_name)
-transaction_container = database.get_container_client(transaction_container_name)
-config_container = database.get_container_client(config_container_name)
-upload_container = database.get_container_client(upload_container_name)
+    return _h_balance(email)
 
 
 
@@ -91,45 +92,19 @@ async def get_current_user_id_from_database():
 
 
 
-async def calculate_balance(email, transaction_container):
-	try:
-		# Fetching data from Cosmos DB transactions table
-		query = f"SELECT * FROM transactions t WHERE t.email = '{email}' ORDER BY t.transaction_ts DESC"
-		cosmos_transactions = transaction_container.query_items(
-			query=query,
-			enable_cross_partition_query=True
-		)
+async def calculate_balance(email, transaction_container=None):
+	"""Delegates to helper transaction store (`transaction_container` argument ignored)."""
+	import asyncio as _asyncio
 
-		transactions = list(cosmos_transactions)
-
-		# Processing Cosmos transactions
-		user_credits = [transaction.get('credit', 0) for transaction in transactions]
-		sum_debit = sum(transaction.get('debit', 0) for transaction in transactions)
-
-		# Calculating balance
-		balance = sum(user_credits) - sum_debit
-		round_balance = round(balance, 2)
-
-		return round_balance
-
-	except exceptions.CosmosHttpResponseError as cosmos_error:
-		# Handle Cosmos DB errors
-		raise cosmos_error
-	except Exception as e:
-		# Handle other exceptions
-		raise e
+	_ignored = transaction_container
+	return await _asyncio.to_thread(calculate_balance_sync, email)
 
 
 
 def check_balance(email):
-	balance = calculate_balance(email, transaction_container)
-	print("Balance", balance)
-	if balance > 0:
-		# Continue with the remaining code
-		return True
-	else:
-		# Insufficient balance, return a message
-		return False
+	bal = calculate_balance_sync(email)
+	print("Balance", bal)
+	return bal > 0
 
 
 

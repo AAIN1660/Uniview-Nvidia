@@ -3,8 +3,6 @@ from fastapi.responses import JSONResponse
 from azure.cosmos import exceptions
 from typing import Optional
 from pydantic import BaseModel
-from azure.cosmos import CosmosClient
-from azure.cosmos import CosmosClient
 from typing import List, Union, Dict, Any
 from fastapi.responses import JSONResponse
 from starlette.requests import Request
@@ -20,28 +18,13 @@ from datetime import datetime, timezone, timedelta
 
 router = APIRouter()
 
-def _clean_env(value, default=None):
-    value = value if value is not None else default
-    if value is None:
-        return None
-    value = str(value).strip()
-    if len(value) >= 2 and value[0] == value[-1] and value[0] in ("'", '"'):
-        value = value[1:-1].strip()
-    return value
-
-
-COSMOS_DATABASE_NAME = _clean_env(os.getenv("COSMOS_DATABASE_NAME"))
-COSMOS_ENDPOINT = _clean_env(os.getenv("COSMOS_ENDPOINT"))
-COSMOS_KEY = _clean_env(os.getenv("COSMOS_KEY"))
-
-
-client = CosmosClient(url=COSMOS_ENDPOINT, credential=COSMOS_KEY)
-database = client.get_database_client(COSMOS_DATABASE_NAME)
-tran_container = database.get_container_client(_clean_env(os.getenv("TRANSACTION_CONTAINER_NAME"), "transactions"))
-user_container = database.get_container_client(_clean_env(os.getenv("USER_CONTAINER_NAME"), "gi_users"))
-uploads_container = database.get_container_client(_clean_env(os.getenv("UPLOAD_CONTAINER_NAME"), "gi_uploads"))
-config_container = database.get_container_client(_clean_env(os.getenv("CONFIG_CONTAINER_NAME"), "config"))
-qa_container = database.get_container_client(_clean_env(os.getenv("QA_CONTAINER_NAME"), "gi_qa"))
+from utility.helper import (
+    category_container as _mongo_category_um,
+    config_container,
+    feedback_container as qa_container,
+    upload_container as uploads_container,
+    user_container,
+)
 
 
 class UserData(BaseModel):
@@ -673,11 +656,11 @@ async def update_user_status(request: Request):
         # Update the user in the container
         user_container.upsert_item(existing_user)
 
-        balance = calculate_balance(email,transaction_container)
+        bal = await calculate_balance(email, transaction_container)
         response_data = {
             "message": "User status updated successfully",
             "role": existing_user.get("role"),
-            "balance": await balance,
+            "balance": bal,
             "status": existing_user.get("status"),
         }
         return JSONResponse(content=response_data)
@@ -689,13 +672,10 @@ async def update_user_status(request: Request):
 @router.put("/update_existing_users_categories")
 async def update_existing_users_categories(request: Request):
     try:
-        data = await request.json()
-        database_name = data.get("database_name")
-        database = client.get_database_client(database_name)
-        category_container = database.get_container_client("gi_category")
-        user_container = database.get_container_client("gi_users")
+        await request.json()
+        category_container_um = _mongo_category_um
         query = f"SELECT cat.id FROM cat WHERE cat.status = 1"
-        cat_list = list(category_container.query_items(query, enable_cross_partition_query=True))
+        cat_list = list(category_container_um.query_items(query, enable_cross_partition_query=True))
         cat_ids = [];
         for cat in cat_list:
             cat_ids.append(cat['id'])
