@@ -25,7 +25,7 @@ import fitz
 import re
 import datetime
 from urllib.parse import unquote_plus
-from azure.storage.blob import BlobServiceClient
+from utility.blob_storage import get_blob_service_client
 import io
 import asyncio
 import time
@@ -109,8 +109,7 @@ search_client_share_point = SearchClient(
     index_name=AZURE_SHARE_POINT_INDEXES_NAME,
     credential=azure_search_credential
 )
-storage_connection_string = _clean_env(os.getenv("BLOB_STORAGE_CONNECTION_STRING"))
-container_name            = _clean_env(os.getenv("BLOB_STORAGE_CONTAINER_NAME"))
+container_name = _clean_env(os.getenv("BLOB_STORAGE_CONTAINER_NAME"))
 
 COSMOS_CONTAINER_NAMES = {
     "config":      _clean_env(os.getenv("CONFIG_CONTAINER_NAME"), "config"),
@@ -799,7 +798,7 @@ async def get_pdf_page(
     all_blob_names = list_blob_files()
     blob_filename  = max(all_blob_names, key=lambda x: similar(blob_name, x))
 
-    blob_service_client = BlobServiceClient.from_connection_string(storage_connection_string)
+    blob_service_client = get_blob_service_client()
     blob_client         = blob_service_client.get_blob_client(container=container_name, blob=blob_filename)
 
     download_stream = blob_client.download_blob()

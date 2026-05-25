@@ -63,7 +63,7 @@ from utility.helper import (
 # from helper import get_sql_table_schema, get_tables_list_by_email, formating_final_answer
 from dotenv import load_dotenv
 import tempfile
-from azure.storage.blob import BlobServiceClient
+from utility.blob_storage import get_blob_service_client
 import matplotlib.pyplot as plt
 import io
 import shutil
@@ -91,9 +91,8 @@ azure_search_credential = AzureKeyCredential(AZURE_SEARCH_ADMIN_KEY)
 
 
 # Blob storage configuration
-BLOB_CONNECTION_STRING = os.getenv("BLOB_STORAGE_CONNECTION_STRING")
 BLOB_CONTAINER_NAME = os.getenv("BLOB_STORAGE_CONTAINER_NAME")
-blob_service_client = BlobServiceClient.from_connection_string(BLOB_CONNECTION_STRING)
+blob_service_client = get_blob_service_client()
 
 
 # GraphRAG LLM and embedding configurations

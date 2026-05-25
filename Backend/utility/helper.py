@@ -12,7 +12,7 @@ from azure.cosmos.errors import CosmosHttpResponseError
 from dotenv import load_dotenv
 from azure.search.documents.aio import SearchClient
 from azure.core.credentials import AzureKeyCredential
-from azure.storage.blob import BlobServiceClient
+from utility.blob_storage import get_blob_service_client, sync_directory_to_bucket
 from difflib import SequenceMatcher
 import re
 import bcrypt
@@ -99,16 +99,16 @@ feedback_container = database.get_container_client("gi_qa")
 upload_container = database.get_container_client(COSMOS_UPLOAD_CONTAINER)
 
 
-storage_connection_string = os.getenv("BLOB_STORAGE_CONNECTION_STRING")
 container_name = os.getenv("BLOB_STORAGE_CONTAINER_NAME")
 
-blob_service_client = BlobServiceClient.from_connection_string(
-    storage_connection_string
-)
+blob_service_client = get_blob_service_client()
 container_client = blob_service_client.get_container_client(container_name)
 
 QUEUE_NAME = os.getenv("AZURE_QUEUE_STORAGE_NAME")
-QUEUE_CLIENT = QueueClient.from_connection_string(storage_connection_string, QUEUE_NAME)
+AZURE_STORAGE_CONNECTION_STRING = os.getenv("AZURE_STORAGE_CONNECTION_STRING")
+QUEUE_CLIENT = QueueClient.from_connection_string(
+    AZURE_STORAGE_CONNECTION_STRING, QUEUE_NAME
+)
 
 
 async def insert_qa_records(
@@ -375,10 +375,7 @@ def nonewlines(s: str) -> str:
 
 def list_blob_files():
 
-    # Initialize the BlobServiceClient
-    blob_service_client = BlobServiceClient.from_connection_string(
-        storage_connection_string
-    )
+    blob_service_client = get_blob_service_client()
 
     # Get the container client
     container_client = blob_service_client.get_container_client(container_name)
@@ -607,6 +604,13 @@ def load_settings(file_path: str, category_id) -> dict:
     report_blob_folder_path = f"graphragoutput/{category_id}/reports"
     config["reporting"]["base_dir"] = report_blob_folder_path
 
+    # GraphRAG indexes on local disk; artifacts sync to MinIO after index.
+    for section in ("input", "storage", "reporting"):
+        if section in config and isinstance(config[section], dict):
+            config[section]["type"] = "file"
+            config[section].pop("connection_string", None)
+            config[section].pop("container_name", None)
+
     # Save the updated settings back to the file
     with open(file_path, "w") as file:
         yaml.safe_dump(config, file)
@@ -635,6 +639,28 @@ async def run_graphrag_index(file_name, data_dir: str, category_id, graph_rag_fi
             check=True,
             cwd=str(backend_root),
         )
+
+        bucket = _strip_quotes(os.getenv("BLOB_STORAGE_CONTAINER_NAME"))
+        artifacts_local = os.path.join(
+            backend_root, f"graphragoutput/{category_id}/artifacts"
+        )
+        reports_local = os.path.join(
+            backend_root, f"graphragoutput/{category_id}/reports"
+        )
+        if bucket and os.path.isdir(artifacts_local):
+            n = sync_directory_to_bucket(
+                artifacts_local,
+                bucket,
+                f"graphragoutput/{category_id}/artifacts",
+            )
+            print(f"[blob-storage] synced {n} artifact file(s) to MinIO")
+        if bucket and os.path.isdir(reports_local):
+            n = sync_directory_to_bucket(
+                reports_local,
+                bucket,
+                f"graphragoutput/{category_id}/reports",
+            )
+            print(f"[blob-storage] synced {n} report file(s) to MinIO")
 
         for file_info in graph_rag_files:
             file_name = file_info.get("file_name")

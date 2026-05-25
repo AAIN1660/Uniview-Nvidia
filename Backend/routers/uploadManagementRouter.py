@@ -12,7 +12,7 @@ from azure.cosmos import exceptions
 from typing import Optional, List
 import asyncio
 import uuid
-from azure.storage.blob import BlobServiceClient
+from utility.blob_storage import get_blob_service_client
 import json
 from azure.storage.queue import QueueClient
 import time
@@ -44,9 +44,7 @@ COSMOS_KEY = os.environ["COSMOS_KEY"]
 client = CosmosClient(url=COSMOS_ENDPOINT, credential=COSMOS_KEY)
 database = client.get_database_client(COSMOS_DATABASE_NAME)
 BLOB_STORAGE_CONTAINER_NAME=os.getenv("BLOB_STORAGE_CONTAINER_NAME")
-BLOB_STORAGE_CONNECTION_STRING = os.getenv("BLOB_STORAGE_CONNECTION_STRING")
- 
-blob_service_client= BlobServiceClient.from_connection_string(BLOB_STORAGE_CONNECTION_STRING)
+blob_service_client = get_blob_service_client()
  
 container_client = blob_service_client.get_container_client(BLOB_STORAGE_CONTAINER_NAME)
  
@@ -62,7 +60,9 @@ azure_search_credential = AzureKeyCredential(azure_search_admin_key)
 search_client = SearchClient(endpoint=service_endpoint, index_name=index_name, credential=azure_search_credential)
  
 QUEUE_NAME = os.getenv("AZURE_GRAPHRAG_QUEUE_STORAGE_NAME")
-QUEUE_CLIENT = QueueClient.from_connection_string(BLOB_STORAGE_CONNECTION_STRING, QUEUE_NAME)
+QUEUE_CLIENT = QueueClient.from_connection_string(
+    os.getenv("AZURE_STORAGE_CONNECTION_STRING"), QUEUE_NAME
+)
  
  
  

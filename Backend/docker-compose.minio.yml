@@ -1,0 +1,34 @@
+# Local MinIO for Unified backend object storage (BLOB_STORAGE_BACKEND=minio).
+#
+# Start:  docker compose -f docker-compose.minio.yml up -d
+# Console: http://localhost:9001  (minioadmin / minioadmin)
+# API:     http://localhost:9000
+#
+# Then in unified.env:
+#   BLOB_STORAGE_BACKEND=minio
+#   MINIO_ENDPOINT=localhost:9000
+#   BLOB_STORAGE_CONTAINER_NAME=unifiedproddocs
+# Run setup once to create the bucket: POST /setup/create (or create_service).
+
+services:
+  minio:
+    image: minio/minio:latest
+    container_name: unified-minio
+    command: server /data --console-address ":9001"
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+volumes:
+  minio_data:

@@ -20,10 +20,6 @@ from azure.cosmos import CosmosClient, exceptions
 from azure.search.documents import SearchClient
 from azure.search.documents import SearchClient
 from azure.core.credentials import AzureKeyCredential
-from azure.storage.blob import BlobServiceClient
-
-
-
 # Configure environment variables
 load_dotenv("unified.env")
 

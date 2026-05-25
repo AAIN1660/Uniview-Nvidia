@@ -9,7 +9,7 @@ from azure.core.credentials import AzureKeyCredential
 from azure.search.documents import SearchClient
 # import fitz
 from azure.cosmos import CosmosClient, exceptions
-from azure.storage.blob import BlobServiceClient
+from utility.blob_storage import get_blob_service_client
 from azure.core.credentials import AzureKeyCredential
 from datetime import datetime
 from azure.cosmos.errors import CosmosHttpResponseError
@@ -59,11 +59,9 @@ openai.api_base = os.environ["AZURE_OPENAI_API_BASE"]
 openai.api_key = os.environ["AZURE_OPENAI_API_KEY"]
 
 chunk_size = int(os.environ["chunk_size"])
-blob_storage_connection_string = os.environ["BLOB_STORAGE_CONNECTION_STRING"]
 blob_storage_container_name = os.environ["BLOB_STORAGE_CONTAINER_NAME"]
 
-blob_service_client = BlobServiceClient.from_connection_string(
-    blob_storage_connection_string)
+blob_service_client = get_blob_service_client()
 container_client = blob_service_client.get_container_client(
     blob_storage_container_name)
 
@@ -687,12 +685,9 @@ def generate_image_description(image_base64):
 
 def get_base64_from_blob(blob_name):
 
-    # # Connect to Azure Storage
-    connection_string = blob_storage_connection_string
-    blob_service_client = BlobServiceClient.from_connection_string(
-        connection_string)
+    blob_service_client = get_blob_service_client()
 
-    # Get a reference to the blob
+    # Get a reference to the object
     blob_client = blob_service_client.get_blob_client(
     container=blob_storage_container_name, blob=blob_name)
 

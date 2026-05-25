@@ -2,10 +2,10 @@ from datetime import datetime, timezone
 from http.client import HTTPException
 from fastapi import APIRouter, Depends
 from azure.cosmos import exceptions, PartitionKey
-from azure.storage.blob import BlobServiceClient, PublicAccess
+from utility.blob_storage import get_blob_service_client, ResourceExistsError
 from dotenv import load_dotenv
 from utility.helper import *
-from azure.core.exceptions import HttpResponseError, ResourceExistsError
+from azure.core.exceptions import HttpResponseError
 from azure.core.credentials import AzureKeyCredential
 from azure.search.documents import SearchClient
 from azure.storage.queue import QueueServiceClient
@@ -146,16 +146,16 @@ async def create_service():
 	print("-----CONFIGURATION INITIALIZED-----")
 
 
-	# Azure Blob Storage setup
-	blob_service_client = BlobServiceClient.from_connection_string(os.getenv("BLOB_STORAGE_CONNECTION_STRING"))
+	# MinIO object storage setup
+	blob_service_client = get_blob_service_client()
 
 	try:
 		container_client = blob_service_client.create_container(BLOB_STORAGE_CONTAINER_NAME,public_access='container')
-		print(f"Container {container_name} created.")
+		print(f"Container {BLOB_STORAGE_CONTAINER_NAME} created.")
 	except ResourceExistsError:
-		print(f"Container {container_name} already exists.")
+		print(f"Container {BLOB_STORAGE_CONTAINER_NAME} already exists.")
 	except Exception as e:
-		print(f"An error occurred while creating the container {container_name}: {e}")
+		print(f"An error occurred while creating the container {BLOB_STORAGE_CONTAINER_NAME}: {e}")
 
 	print("-----BLOB STORAGE CREATED-----")
 
@@ -235,7 +235,9 @@ async def create_service():
 
 
 	# Azure Storage Queue setup
-	queue_service_client = QueueServiceClient.from_connection_string(os.getenv("BLOB_STORAGE_CONNECTION_STRING"))
+	queue_service_client = QueueServiceClient.from_connection_string(
+		os.getenv("AZURE_STORAGE_CONNECTION_STRING")
+	)
 	queue_name = os.getenv("AZURE_QUEUE_STORAGE_NAME")
 
 	try:

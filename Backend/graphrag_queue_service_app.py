@@ -35,11 +35,11 @@ logging.getLogger("azure.core.pipeline.policies.http_logging_policy").setLevel(l
 logging.getLogger("azure.monitor.opentelemetry.exporter.export._base").setLevel(logging.ERROR)
 logger = logging.getLogger(__name__)
 
-connection_string = os.getenv("BLOB_STORAGE_CONNECTION_STRING")
+connection_string = os.getenv("AZURE_STORAGE_CONNECTION_STRING")
 queue_name = os.getenv("AZURE_GRAPHRAG_QUEUE_STORAGE_NAME")
 if not connection_string or not queue_name:
     raise RuntimeError(
-        "BLOB_STORAGE_CONNECTION_STRING and AZURE_GRAPHRAG_QUEUE_STORAGE_NAME must be set in unified.env"
+        "AZURE_STORAGE_CONNECTION_STRING and AZURE_GRAPHRAG_QUEUE_STORAGE_NAME must be set in unified.env"
     )
 
 queue_client = QueueClient.from_connection_string(connection_string, queue_name)

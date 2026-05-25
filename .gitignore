@@ -69,6 +69,10 @@ replacements.txt
 **/graphragoutput/**/*.txn
 **/.vite/
 
+# --- Local MinIO (runtime data + binary; do not commit) ---
+Backend/minio-data/
+Backend/tools/minio/minio.exe
+
 # --- Misc ---
 **/.scannerwork/
 *.pdf

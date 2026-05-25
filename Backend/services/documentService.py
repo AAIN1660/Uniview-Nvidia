@@ -1,6 +1,6 @@
 from fastapi import Request, HTTPException, File, UploadFile, Form,APIRouter,Query
 from fastapi.responses import JSONResponse
-from azure.storage.blob import BlobServiceClient
+from utility.blob_storage import get_blob_service_client
 import os
 from datetime import datetime
 from azure.search.documents import SearchClient
@@ -53,9 +53,8 @@ upload_container = database.get_container_client("gi_uploads")
 category_container = database.get_container_client("gi_category")
 feedback_container = database.get_container_client("gi_qa")
 
-BLOB_STORAGE_CONNECTION_STRING = os.getenv("BLOB_STORAGE_CONNECTION_STRING")
 BLOB_STORAGE_CONTAINER_NAME=os.getenv("BLOB_STORAGE_CONTAINER_NAME")
-blob_service_client= BlobServiceClient.from_connection_string(BLOB_STORAGE_CONNECTION_STRING)
+blob_service_client = get_blob_service_client()
 container_client = blob_service_client.get_container_client(BLOB_STORAGE_CONTAINER_NAME)
 
 # Share point key and endpoint details
@@ -67,7 +66,9 @@ indexer_name = os.environ["AZURE_SHARE_POINT_INDEXR_NAME"]
 indexers_client = SearchIndexerClient(azure_search_service_endpoint, AzureKeyCredential(azure_search_admin_key))
 
 QUEUE_NAME = os.getenv("AZURE_QUEUE_STORAGE_NAME")
-QUEUE_CLIENT = QueueClient.from_connection_string(BLOB_STORAGE_CONNECTION_STRING, QUEUE_NAME)
+QUEUE_CLIENT = QueueClient.from_connection_string(
+    os.getenv("AZURE_STORAGE_CONNECTION_STRING"), QUEUE_NAME
+)
 
 @router.post("/uploadFile")
 async def create_upload_file(

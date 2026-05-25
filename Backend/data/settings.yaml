@@ -35,12 +35,10 @@ entity_extraction:
 global_search: null
 input:
   base_dir: graphraginput/input
-  connection_string: ${BLOB_STORAGE_CONNECTION_STRING}
-  container_name: ${BLOB_STORAGE_CONTAINER_NAME}
   file_encoding: utf-8
   file_pattern: .*\.txt$
   file_type: text
-  type: blob
+  type: file
 llm:
   api_base: ${GRAPH_RAG_OPENAI_API_BASE}
   api_key: ${GRAPH_RAG_OPENAI_API_KEY}
@@ -55,9 +53,7 @@ parallelization:
   stagger: 0.3
 reporting:
   base_dir: graphragoutput/b7ec5651-e2b5-4343-8f83-e691d012104c/reports
-  connection_string: ${BLOB_STORAGE_CONNECTION_STRING}
-  container_name: ${BLOB_STORAGE_CONTAINER_NAME}
-  type: blob
+  type: file
 skip_workflows: []
 snapshots:
   graphml: false
@@ -65,9 +61,7 @@ snapshots:
   top_level_nodes: false
 storage:
   base_dir: graphragoutput/b7ec5651-e2b5-4343-8f83-e691d012104c/artifacts
-  connection_string: ${BLOB_STORAGE_CONNECTION_STRING}
-  container_name: ${BLOB_STORAGE_CONTAINER_NAME}
-  type: blob
+  type: file
 summarize_descriptions:
   max_length: 500
   prompt: prompts/summarize_descriptions.txt

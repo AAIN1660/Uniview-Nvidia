@@ -18,7 +18,8 @@ dependencies = [
   "pyodbc",
   "pydantic",
   "pyyaml",
-  "httpx"
+  "httpx",
+  "minio>=7.2.0"
 ]
 
 [tool.setuptools.packages.find]

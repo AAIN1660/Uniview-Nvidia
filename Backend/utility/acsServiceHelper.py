@@ -13,7 +13,6 @@ from tenacity import retry, wait_random_exponential, stop_after_attempt
 from azure.search.documents import SearchClient
 from azure.core.credentials import AzureKeyCredential
 import ast
-from azure.storage.blob import BlobServiceClient
 from azure.search.documents.models import VectorizedQuery, QueryType
 
 
@@ -38,12 +37,6 @@ openai.api_base = os.getenv("AZURE_OPENAI_API_BASE")
 openai.api_key = os.getenv("AZURE_OPENAI_API_KEY")
 
 client = get_embedding_client()
-
-blob_connection_string = os.getenv("BLOB_STORAGE_CONNECTION_STRING")
-blob_container_name = os.getenv("BLOB_STORAGE_CONTAINER_NAME")
-
-
-
 
 
 #----------------------- INDEXING START#------------------------------------

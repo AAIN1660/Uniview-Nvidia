@@ -65,15 +65,13 @@ def main() -> int:
 
     blob_client = None
     container = os.getenv("BLOB_STORAGE_CONTAINER_NAME")
-    conn = os.getenv("BLOB_STORAGE_CONNECTION_STRING")
-
     if not args.local_dir:
-        if not container or not conn:
-            print("ERROR: set BLOB_STORAGE_CONTAINER_NAME and BLOB_STORAGE_CONNECTION_STRING, or use --local-dir")
+        if not container:
+            print("ERROR: set BLOB_STORAGE_CONTAINER_NAME or use --local-dir")
             return 2
-        from azure.storage.blob import BlobServiceClient
+        from utility.blob_storage import get_blob_service_client
 
-        blob_client = BlobServiceClient.from_connection_string(conn)
+        blob_client = get_blob_service_client()
 
     report = verify_graphrag_artifacts(
         folder_path=folder,

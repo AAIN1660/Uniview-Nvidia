@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 app = FastAPI()
 
-connection_string = os.getenv('BLOB_STORAGE_CONNECTION_STRING')
+connection_string = os.getenv('AZURE_STORAGE_CONNECTION_STRING')
 queue_name = os.getenv("AZURE_QUEUE_STORAGE_NAME")
 queue_client = QueueClient.from_connection_string(connection_string, queue_name)
 
