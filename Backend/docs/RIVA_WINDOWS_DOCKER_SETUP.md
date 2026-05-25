@@ -1,21 +1,21 @@
-# Riva on Windows — Docker + WSL2 (works with Uniview `/speech/*`)
+# Riva on Windows ï¿½ Docker + WSL2 (works with Uniview `/speech/*`)
 
 Your backend expects a **running NVIDIA Riva Speech server** on gRPC at **`RIVA_SPEECH_URI`** (default **`localhost:50051`**). Riva is officially shipped as **Docker images** from NGC. On Windows, use **Docker Desktop** with the **WSL2** backend and an **NVIDIA GPU** (Riva is not practical on CPU for normal use).
 
 References:
 
-- [NVIDIA Riva — Local (Docker)](https://docs.nvidia.com/deeplearning/riva/user-guide/docs/installation/deploy-local.html)
-- [NVIDIA Riva — Quick Start](https://docs.nvidia.com/deeplearning/riva/user-guide/docs/quick-start-guide.html)
+- [NVIDIA Riva ï¿½ Local (Docker)](https://docs.nvidia.com/deeplearning/riva/user-guide/docs/installation/deploy-local.html)
+- [NVIDIA Riva ï¿½ Quick Start](https://docs.nvidia.com/deeplearning/riva/user-guide/docs/quick-start-guide.html)
 - [Riva quickstart bundle (NGC)](https://catalog.ngc.nvidia.com/orgs/nvidia/teams/riva/resources/riva_quickstart)
 - [Docker Desktop GPU (WSL2)](https://docs.docker.com/desktop/features/gpu/)
 
 ---
 
-## Part A — One-time OS / Docker installation
+## Part A ï¿½ One-time OS / Docker installation
 
 ### A1. Windows and GPU driver
 
-1. Install the **latest NVIDIA driver** from [NVIDIA drivers](https://www.nvidia.com/Download/index.aspx) (your laptop GPU must support **CUDA**/WSL if you follow NVIDIA’s Riva Docker path).
+1. Install the **latest NVIDIA driver** from [NVIDIA drivers](https://www.nvidia.com/Download/index.aspx) (your laptop GPU must support **CUDA**/WSL if you follow NVIDIAï¿½s Riva Docker path).
 
 2. In **PowerShell (Admin)**:
 
@@ -58,11 +58,11 @@ References:
    docker run --rm --gpus all nvcr.io/nvidia/cuda:12.0.0-base-ubuntu22.04 nvidia-smi
    ```
 
-   You should see `nvidia-smi` output **inside** the container. If this fails, Riva containers will fail too — fix Docker/GPU/WSL integration first.
+   You should see `nvidia-smi` output **inside** the container. If this fails, Riva containers will fail too ï¿½ fix Docker/GPU/WSL integration first.
 
 ---
 
-## Part B — NGC account and API key
+## Part B ï¿½ NGC account and API key
 
 1. Create/login at [NVIDIA NGC](https://catalog.ngc.nvidia.com/).
 
@@ -72,9 +72,9 @@ References:
 
 ---
 
-## Part C — Riva quick-start (inside WSL Ubuntu)
+## Part C ï¿½ Riva quick-start (inside WSL Ubuntu)
 
-These steps mirror NVIDIA’s “Local (Docker)” guide. Paths are examples — use your real download folder.
+These steps mirror NVIDIAï¿½s ï¿½Local (Docker)ï¿½ guide. Paths are examples ï¿½ use your real download folder.
 
 ### C1. Open WSL Ubuntu
 
@@ -115,7 +115,7 @@ docker ps
 
 Edit **`config.sh`** in that directory (NVIDIA documents every flag inside the file). For your app you need **ASR** enabled (and **TTS** too if you use read-aloud). Keep the **gRPC** port **`50051`** unless you deliberately change Docker port mapping everywhere.
 
-### C5. Log in to NVIDIA’s registry (once)
+### C5. Log in to NVIDIAï¿½s registry (once)
 
 ```bash
 docker login nvcr.io
@@ -126,7 +126,7 @@ Use:
 - Username: **`$oauthtoken`**
 - Password: your **NGC API key** (pastes masked)
 
-### C6. Initialize (downloads images + models — long first run)
+### C6. Initialize (downloads images + models ï¿½ long first run)
 
 ```bash
 cd ~/riva-quickstart
@@ -134,7 +134,7 @@ export NGC_API_KEY='paste-your-ngc-api-key-here'
 bash riva_init.sh
 ```
 
-Wait until NVIDIA’s message indicates success, e.g. that you should run **`riva_start.sh`**.
+Wait until NVIDIAï¿½s message indicates success, e.g. that you should run **`riva_start.sh`**.
 
 ### C7. Start Riva
 
@@ -148,7 +148,7 @@ bash riva_start.sh
 docker logs riva-speech 2>&1 | tail -n 50
 ```
 
-Look for a line like **Riva … listening on 0.0.0.0:50051** (wording can vary slightly by release).
+Look for a line like **Riva ï¿½ listening on 0.0.0.0:50051** (wording can vary slightly by release).
 
 From **Windows PowerShell** (host):
 
@@ -168,7 +168,7 @@ bash riva_stop.sh
 
 ---
 
-## Part D — This repository (Python API + UI)
+## Part D ï¿½ This repository (Python API + UI)
 
 ### D1. Backend Python client
 
@@ -182,7 +182,7 @@ pip install -r requirements-riva-speech.txt
 
 ### D2. `unified.env` (Backend)
 
-Set at least (adjust if you changed Riva’s host/port):
+Set at least (adjust if you changed Rivaï¿½s host/port):
 
 ```env
 RIVA_SPEECH_URI=localhost:50051
@@ -199,7 +199,7 @@ RIVA_ASR_MODEL=your-riva-asr-model-name
 RIVA_TTS_VOICE=your-riva-voice-name
 ```
 
-(Model/voice strings must match what your Riva quickstart loaded — check Riva docs for your `config.sh` choices.)
+(Model/voice strings must match what your Riva quickstart loaded ï¿½ check Riva docs for your `config.sh` choices.)
 
 Restart **uvicorn** after editing `unified.env`.
 
