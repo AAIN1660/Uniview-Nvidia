@@ -233,9 +233,9 @@ Example:
 2.2 Chart Customization:
     Use Seaborn for better aesthetics and clarity.
     Different categories should have different colors based on insights.
-    Display numerical values above each bar for clarity.
+    Do not add bar value labels in python_code (the server adds them automatically).
     Ensure charts are aligned and formatted for clarity.
-    Avoid chart element overlaps (labels, bars, points).
+    Avoid chart element overlaps (labels, title, bars, points). Use plt.tight_layout() after setting the title.
     Use professional chart design principles (clean, readable, and visually appealing).
  
 2.3 Labeling & Titles:

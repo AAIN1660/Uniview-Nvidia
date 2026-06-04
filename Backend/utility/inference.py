@@ -66,6 +66,7 @@ import tempfile
 from utility.blob_storage import get_blob_service_client
 import matplotlib.pyplot as plt
 import io
+import re
 import shutil
 from pathlib import Path
 
@@ -759,6 +760,89 @@ async def extract_context(question: str = None, vector_weight: float = 0.5, grap
     
 
  
+_LABEL_LINE_MARKERS = (
+    "bar_label",
+    "plt.text(",
+    "ax.text(",
+    ".annotate(",
+    "ax.annotate(",
+    "textcoords=",
+)
+
+
+def _sanitize_plot_code(plot_code: str) -> str:
+    """Remove model-generated bar labels so we draw exactly one label per bar."""
+    cleaned: list[str] = []
+    for line in plot_code.splitlines():
+        stripped = line.strip()
+        if not stripped:
+            cleaned.append(line)
+            continue
+        lower = stripped.lower()
+        if any(marker in lower for marker in _LABEL_LINE_MARKERS):
+            continue
+        if ".apply(" in lower and ("text(" in lower or "annotate" in lower):
+            continue
+        cleaned.append(line)
+    return "\n".join(cleaned)
+
+
+def _max_bar_height(ax) -> float:
+    max_h = 0.0
+    for patch in getattr(ax, "patches", []) or []:
+        height = patch.get_height()
+        if height is None:
+            continue
+        try:
+            max_h = max(max_h, float(height))
+        except (TypeError, ValueError):
+            pass
+    return max_h
+
+
+def _finalize_bar_chart(ax) -> None:
+    """Single source of truth for bar labels, ylim, and title placement."""
+    # Drop any text the model drew before sanitization caught it (prevents garbled overlap).
+    for text_artist in list(ax.texts):
+        text_artist.remove()
+
+    title = ax.get_title()
+    if title:
+        ax.set_title("")
+
+    max_bar = _max_bar_height(ax)
+    ymin, ymax = ax.get_ylim()
+    if max_bar > 0:
+        ax.set_ylim(bottom=min(ymin, 0), top=max_bar * 1.32)
+    elif ymax > ymin:
+        ax.set_ylim(bottom=ymin, top=ymax + (ymax - ymin) * 0.32)
+
+    if getattr(ax, "patches", None):
+        for patch in ax.patches:
+            height = patch.get_height()
+            if height is None:
+                continue
+            try:
+                label = f"{float(height):,.0f}"
+            except Exception:
+                label = str(height)
+            ax.annotate(
+                label,
+                (patch.get_x() + patch.get_width() / 2.0, height),
+                ha="center",
+                va="bottom",
+                xytext=(0, 8),
+                textcoords="offset points",
+                fontsize=10,
+                clip_on=False,
+            )
+
+    fig = ax.figure
+    if title:
+        fig.suptitle(title, fontsize=13, y=0.98)
+    fig.subplots_adjust(top=0.82, bottom=0.12, left=0.12, right=0.95)
+
+
 def plot_to_base64(plot_code):
     try:
         # Set figure size before executing plot code
@@ -766,6 +850,7 @@ def plot_to_base64(plot_code):
        
         # Clean up the plot code if necessary
         plot_code = plot_code.replace("plt.show()", " ")  # Prevent plt.show() from blocking execution
+        plot_code = _sanitize_plot_code(plot_code)
 
         # Run generated code inside an explicit context so symbols like
         # pd/plt/sns/df resolve consistently during lambdas/comprehensions.
@@ -791,28 +876,10 @@ def plot_to_base64(plot_code):
             plt.figure(figsize=(8, 6))
             exec(safe_code, exec_ctx, exec_ctx)
 
-        # Generic value labels for bar plots if bars exist.
-        ax = plt.gca()
-        if getattr(ax, "patches", None):
-            for patch in ax.patches:
-                height = patch.get_height()
-                if height is None:
-                    continue
-                try:
-                    label = f"{float(height):,.0f}"
-                except Exception:
-                    label = str(height)
-                ax.annotate(
-                    label,
-                    (patch.get_x() + patch.get_width() / 2.0, height),
-                    ha="center",
-                    va="bottom",
-                    xytext=(0, 4),
-                    textcoords="offset points",
-                )
-       
+        _finalize_bar_chart(plt.gca())
+
         # Ensure that the layout of the plot is not cropped
-        plt.tight_layout()
+        plt.tight_layout(rect=[0, 0, 1, 0.96])
  
         # Convert the plot to a base64-encoded image using 'bbox_inches="tight"' to avoid cropping
         buf = io.BytesIO()
